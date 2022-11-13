@@ -7,7 +7,7 @@
 class L2Loss : public Loss{
 public:
     L2Loss() = default;
-    ~L2Loss() = default;
+    ~L2Loss();
     double forward(Tensor&, const Tensor&) override;
     Tensor backward(const Tensor&) override;
 

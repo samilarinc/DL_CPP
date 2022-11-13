@@ -3,6 +3,12 @@
 
 #define EPSILON 1e-9
 
+CrossEntropyLoss::~CrossEntropyLoss() {
+    if(this->last_input.data != nullptr) {
+        delete this->last_input.data;
+    }
+}
+
 double CrossEntropyLoss::forward(Tensor& input, const Tensor& target){
     last_input = input.copy();
     double loss = 0;

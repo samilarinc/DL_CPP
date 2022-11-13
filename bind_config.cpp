@@ -8,6 +8,7 @@
 #include "L1Loss.hpp"
 #include "L2Loss.hpp"
 #include "CrossEntropyLoss.hpp"
+#include "ReLU.hpp"
 
 namespace py = pybind11;
 using namespace std;
@@ -99,5 +100,10 @@ PYBIND11_MODULE(pyflow, m){
         .def(py::init<>())
         .def("forward", &CrossEntropyLoss::forward)
         .def("backward", &CrossEntropyLoss::backward)
+        ;
+    py::class_<ReLU>(m, "ReLU")
+        .def(py::init<>())
+        .def("forward", &ReLU::forward)
+        .def("backward", &ReLU::backward)
         ;
 }

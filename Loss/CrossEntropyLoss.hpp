@@ -7,7 +7,7 @@
 class CrossEntropyLoss : public Loss{
 public:
     CrossEntropyLoss() = default;
-    ~CrossEntropyLoss() = default;
+    ~CrossEntropyLoss();
     double forward(Tensor&, const Tensor&) override;
     Tensor backward(const Tensor&) override;
 

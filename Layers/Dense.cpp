@@ -16,7 +16,29 @@ Dense::Dense(int input_size, int output_size, double lr, string opt, double mu_m
     }
 }
 
-Dense::~Dense() = default;
+Dense::~Dense(){
+    if(last_input.data != nullptr) {
+        free(last_input.data);
+    }
+    if(weights.data != nullptr) {
+        free(weights.data);
+    }
+    if(bias.data != nullptr) {
+        free(bias.data);
+    }
+    if(gradient_weights.data != nullptr) {
+        free(gradient_weights.data);
+    }
+    if(gradient_bias.data != nullptr) {
+        free(gradient_bias.data);
+    }
+    if(optimizer != nullptr) {
+        delete optimizer;
+    }
+    if(bias_optimizer != nullptr) {
+        delete bias_optimizer;
+    }
+}
 
 Tensor Dense::getWeights() const {
     return weights;

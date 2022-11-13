@@ -7,12 +7,14 @@
 class SGD : public BaseOptimizer {
 public:
     SGD(double);
+    SGD(double, double);
     ~SGD() = default;
     void calculate_update(Tensor&, Tensor) override;
     double getLearningRate() const;
-    // SGD* clone() const;
-private:
+
     double learning_rate;
+    double momentum;
+    Tensor velocity;
 };
 
 #endif
