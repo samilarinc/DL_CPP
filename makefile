@@ -3,6 +3,7 @@ all:
 	-I /mnt/c/Users/pc/repos/DL_Framework_C/Layers -I /mnt/c/Users/pc/repos/DL_Framework_C/Loss \
 	-I /mnt/c/Users/pc/repos/DL_Framework_C/Optimizers -I /mnt/c/Users/pc/repos/DL_Framework_C/Tensor \
 	-I /mnt/c/Users/pc/repos/DL_Framework_C/Layers -I /mnt/c/Users/pc/repos/DL_Framework_C \
-	Tensor/Tensor.cpp Loss/L2Loss.cpp Optimizers/SGD.cpp Layers/Dense.cpp bind_config.cpp -o pyflow.cpython-38-x86_64-linux-gnu.so
+	Tensor/Tensor.cpp Loss/L1Loss.cpp Loss/L2Loss.cpp Loss/CrossEntropyLoss.cpp \
+	Optimizers/SGD.cpp Layers/Dense.cpp bind_config.cpp -o pyflow.cpython-38-x86_64-linux-gnu.so
 clean:
 	rm -f *.o *.so

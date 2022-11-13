@@ -1,6 +1,6 @@
 #include "L1Loss.hpp"
 
-double L1Loss::forward(Tensor output, const Tensor& target) {
+double L1Loss::forward(Tensor& output, const Tensor& target) {
     last_input = output;
     return (output - target).abs().sum();
 }

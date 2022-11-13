@@ -55,6 +55,7 @@ public:
     void setitem(int, int, double);
     void setitem(int, int, const Tensor&);
     void setitem(int, const Tensor&);
+    int size() const;
     vector<vector<vector<double>>> tolist() const;
     tuple<int, int, int> shape;
 // private:

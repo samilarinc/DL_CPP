@@ -428,3 +428,7 @@ Tensor& Tensor::operator/=(double value){
     }
     return *this;
 }
+
+int Tensor::size() const{
+    return batch_size * rows * cols;
+}

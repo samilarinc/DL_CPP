@@ -7,6 +7,7 @@
 #include "BaseOptimizer.hpp"
 #include "L1Loss.hpp"
 #include "L2Loss.hpp"
+#include "CrossEntropyLoss.hpp"
 
 namespace py = pybind11;
 using namespace std;
@@ -20,6 +21,7 @@ PYBIND11_MODULE(pyflow, m){
         .def(py::init<vector<vector<vector<double>>>>())
         .def(py::init<vector<vector<double>>>())
         .def(py::init<vector<double>>())
+        .def("__len__", &Tensor::size)
         .def("__add__", py::overload_cast<const Tensor&>(&Tensor::operator+))
         .def("__add__", py::overload_cast<double>(&Tensor::operator+))
         .def("__sub__", py::overload_cast<const Tensor&>(&Tensor::operator-))
@@ -93,6 +95,9 @@ PYBIND11_MODULE(pyflow, m){
         .def("forward", &L2Loss::forward)
         .def("backward", &L2Loss::backward)
         ;
-    
-    
+    py::class_<CrossEntropyLoss>(m, "CrossEntropyLoss")
+        .def(py::init<>())
+        .def("forward", &CrossEntropyLoss::forward)
+        .def("backward", &CrossEntropyLoss::backward)
+        ;
 }
