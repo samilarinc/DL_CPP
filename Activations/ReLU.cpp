@@ -5,9 +5,9 @@ ReLU::ReLU() {
 }
 
 ReLU::~ReLU() {
-    if(last_input.data != nullptr) {
-        free(last_input.data);
-    }
+    // if(last_input.data != nullptr) {
+    //     free(last_input.data);
+    // }
 }
 
 Tensor ReLU::forward(const Tensor& input) {

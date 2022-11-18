@@ -143,7 +143,12 @@ Tensor Tensor::operator/(const Tensor& other) {
     }
     Tensor result(batch_size, rows, cols);
     for (int i = 0; i < batch_size * rows * cols; i++) {
-        result.data[i] = data[i] / other.data[i];
+        if(other.data[i] == 0){
+            result.data[i] = data[i] / (other.data[i] + 1e-9);
+        }
+        else{
+            result.data[i] = data[i] / other.data[i];
+        }
     }
     return result;
 }
@@ -396,7 +401,12 @@ Tensor& Tensor::operator/=(const Tensor& tensor2){
         return *this;
     }
     for(int i = 0; i < batch_size * rows * cols; i++){
-        data[i] /= tensor2.data[i];
+        if(tensor2.data[i] == 0){
+            data[i] /= tensor2.data[i] + 1e-10;            
+        }
+        else{
+            data[i] /= tensor2.data[i];
+        }
     }
     return *this;
 }
@@ -423,6 +433,9 @@ Tensor& Tensor::operator*=(double value){
 }
 
 Tensor& Tensor::operator/=(double value){
+    if(value == 0){
+        value += 1e-10;
+    }
     for(int i = 0; i < batch_size * rows * cols; i++){
         data[i] /= value;
     }

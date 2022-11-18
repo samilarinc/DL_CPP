@@ -4,41 +4,19 @@
 #include "BaseOptimizer.hpp"
 #include <string>
 
-Dense::Dense(int input_size, int output_size, double lr, string opt, double mu_mentum, double rho) {
+Dense::Dense(int input_size, int output_size, double momentum, double lr, string opt, double mu, double rho) {
     this->input_size = input_size;
     this->output_size = output_size;
-    weights = Tensor(1, output_size, input_size, 1);
+    weights = Tensor(1, output_size, input_size, 1.0);
     bias = Tensor(1, output_size, 1, 0.1);
     if(opt == "SGD") {
-        printf("SGD");
+        printf("SGD Optimizer with learning rate %f and momentum %f", lr, momentum);
         this->optimizer = new SGD(lr);
         this->bias_optimizer = new SGD(lr);
     }
 }
 
-Dense::~Dense(){
-    if(last_input.data != nullptr) {
-        free(last_input.data);
-    }
-    if(weights.data != nullptr) {
-        free(weights.data);
-    }
-    if(bias.data != nullptr) {
-        free(bias.data);
-    }
-    if(gradient_weights.data != nullptr) {
-        free(gradient_weights.data);
-    }
-    if(gradient_bias.data != nullptr) {
-        free(gradient_bias.data);
-    }
-    if(optimizer != nullptr) {
-        delete optimizer;
-    }
-    if(bias_optimizer != nullptr) {
-        delete bias_optimizer;
-    }
-}
+Dense::~Dense() = default;
 
 Tensor Dense::getWeights() const {
     return weights;
