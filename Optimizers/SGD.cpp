@@ -13,13 +13,15 @@ SGD::SGD(double learning_rate, double momentum) {
 }
 
 void SGD::calculate_update(Tensor& weights, Tensor gradient_weights) {
-    weights = weights - (gradient_weights * this->learning_rate);
     if(this->momentum != 0.0) {
         if(this->velocity.getRows() == 0) { // Initialize velocity first time
-            this->velocity = Tensor(gradient_weights.getBatchsize(), gradient_weights.getRows(), gradient_weights.getCols()); 
+            this->velocity = Tensor(gradient_weights); 
         }
-        this->velocity = this->velocity * this->momentum + gradient_weights * this->learning_rate;
-        weights = weights - this->velocity;
+        this->velocity = this->velocity * this->momentum + gradient_weights;
+        weights = weights - this->velocity * this->learning_rate;
+    }
+    else {
+        weights = weights - gradient_weights * this->learning_rate;
     }
 }
 

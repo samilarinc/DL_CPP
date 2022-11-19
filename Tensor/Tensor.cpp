@@ -28,6 +28,20 @@ Tensor::Tensor(int batch_size, int rows, int cols, double constant){
     }
 }
 
+Tensor::Tensor(int batch_size, int rows, int cols, double min, double max){ 
+    this->batch_size = batch_size;
+    this->rows = rows;
+    this->cols = cols;
+    this->shape = make_tuple(batch_size, rows, cols);
+    data = new double[batch_size * rows * cols]();
+    random_device rd;
+    mt19937 gen(rd());
+    uniform_real_distribution<> dis(min, max);
+    for(int i = 0; i < batch_size * rows * cols; i++){
+        data[i] = dis(gen);
+    }
+}
+
 Tensor::Tensor(vector<vector<vector<double>>> data) {
     batch_size = data.size();
     rows = data[0].size();

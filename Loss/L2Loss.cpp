@@ -8,9 +8,9 @@ L2Loss::~L2Loss() {
 
 double L2Loss::forward(Tensor& output, const Tensor& target) {
     last_input = output.copy();
-    return (output - target).power(2).sum();
+    return (output - target).power(2).sum() / output.getBatchsize();
 }
 
 Tensor L2Loss::backward(const Tensor& target) {
-    return (last_input - target) * 2.0;
+    return (last_input - target) * 2.0 / last_input.getBatchsize();
 }

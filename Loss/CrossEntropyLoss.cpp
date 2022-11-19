@@ -19,7 +19,7 @@ double CrossEntropyLoss::forward(Tensor& input, const Tensor& target){
             }
         }
     }
-    return loss;
+    return loss / input.getBatchsize();
 }
 
 Tensor CrossEntropyLoss::backward(const Tensor &target){
@@ -31,5 +31,5 @@ Tensor CrossEntropyLoss::backward(const Tensor &target){
             }
         }
     }
-    return output;
+    return output / last_input.getBatchsize();
 }

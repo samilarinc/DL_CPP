@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <math.h>
+#include <random>
 
 using namespace std;
 
@@ -13,6 +14,7 @@ public:
     Tensor();
     Tensor(int, int, int);
     Tensor(int, int, int, double);
+    Tensor(int, int, int, double, double); 
     Tensor(const Tensor&);
     Tensor(vector<vector<vector<double>>>);
     Tensor(vector<vector<double>>);

@@ -5,12 +5,14 @@
 #include "BaseLayer.hpp"
 #include "BaseOptimizer.hpp"
 #include "SGD.hpp"
+#include <string>
 
 class Dense : public BaseLayer {
 public:
     Dense() = default;
     Dense(int input_size, int output_size, double lr, double momentum, string opt = "NULL", double mu = 0, double rho = 0);
     Dense(int input_size, int output_size, double lr, string opt) : Dense(input_size, output_size, 0, lr, opt, 0, 0) {};
+    Dense(int input_size, int output_size, double lr, string opt, double momentum) : Dense(input_size, output_size, momentum, lr, opt, 0, 0) {};
     Dense(int input_size, int output_size) : Dense(input_size, output_size, 0, 0.1, "NULL", 0, 0) {};
     ~Dense();
     Tensor getWeights() const;

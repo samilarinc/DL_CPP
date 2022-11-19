@@ -1,0 +1,9 @@
+- [ ] save model
+- [ ] load model
+- [ ] predict
+- [ ] call model directly with input instead of test
+- [ ] evaluate
+- [ ] scheduler for optimizer
+- [ ] adam optimizer
+- [ ] sigmoid activation
+- [ ] more initializers

@@ -1,16 +1,12 @@
 #include "Dense.hpp"
-#include "Tensor.hpp"
-#include "SGD.hpp"
-#include "BaseOptimizer.hpp"
-#include <string>
 
 Dense::Dense(int input_size, int output_size, double momentum, double lr, string opt, double mu, double rho) {
     this->input_size = input_size;
     this->output_size = output_size;
-    weights = Tensor(1, output_size, input_size, 1.0);
-    bias = Tensor(1, output_size, 1, 0.1);
+    weights = Tensor(1, output_size, input_size, 0.0, 1.0);
+    bias = Tensor(1, output_size, 1, 0.0, 1.0);
     if(opt == "SGD") {
-        printf("SGD Optimizer with learning rate %f and momentum %f", lr, momentum);
+        // printf("SGD Optimizer with learning rate %f and momentum %f\n\n", lr, momentum);
         this->optimizer = new SGD(lr);
         this->bias_optimizer = new SGD(lr);
     }
@@ -55,6 +51,8 @@ Tensor Dense::backward(const Tensor& error) {
             db(0, j, 0) += error(i, j, 0);
         }
     }
+    dw = dw / batch_size;
+    db = db / batch_size;
 
     if(optimizer != nullptr) {
         optimizer->calculate_update(weights, dw);
