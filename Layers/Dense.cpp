@@ -1,6 +1,6 @@
 #include "Dense.hpp"
 
-Dense::Dense(int input_size, int output_size, double momentum, double lr, string opt, double mu, double rho) {
+Dense::Dense(int input_size, int output_size, double lr, string opt, double momentum, double mu, double rho) {
     this->input_size = input_size;
     this->output_size = output_size;
     weights = Tensor(1, output_size, input_size, 0.0, 1.0);
@@ -9,6 +9,16 @@ Dense::Dense(int input_size, int output_size, double momentum, double lr, string
         // printf("SGD Optimizer with learning rate %f and momentum %f\n\n", lr, momentum);
         this->optimizer = new SGD(lr);
         this->bias_optimizer = new SGD(lr);
+    }
+    else if(opt == "Adam") {
+        // printf("Adam Optimizer with learning rate %f, mu %f and rho %f\n\n", lr, mu, rho);
+        this->optimizer = new Adam(lr, mu, rho);
+        this->bias_optimizer = new Adam(lr, mu, rho);
+    }
+    else {
+        // printf("No optimizer specified, using SGD with learning rate %f and momentum %f\n\n", lr, momentum);
+        this->optimizer = nullptr;
+        this->bias_optimizer = nullptr;
     }
 }
 

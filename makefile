@@ -6,7 +6,7 @@ all:
 	-I /mnt/c/Users/pc/repos/DL_Framework_C/Layers -I /mnt/c/Users/pc/repos/DL_Framework_C \
 	-I /mnt/c/Users/pc/repos/DL_Framework_C/Activations \
 	Tensor/Tensor.cpp Loss/L1Loss.cpp Loss/L2Loss.cpp Loss/CrossEntropyLoss.cpp \
-	Optimizers/SGD.cpp Layers/Dense.cpp Activations/ReLU.cpp \
+	Optimizers/SGD.cpp Optimizers/Adam.cpp Layers/Dense.cpp Activations/ReLU.cpp \
 	bind_config.cpp -o pyflow.cpython-38-x86_64-linux-gnu.so
 clean:
 	rm -f *.o *.so

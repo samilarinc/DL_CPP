@@ -1,4 +1,6 @@
-from pyflow import Tensor as t
+from pyflow import *
+
+t = Tensor
 
 class NeuralNetwork(object):
     def __init__(self, optimizer):
@@ -46,7 +48,7 @@ class NeuralNetwork(object):
             self.data.finished = False
             if verbose:
                 if cross_val:
-                    valloss = (self.test(valset[0]) - valset[1]).power(2).sum() / valset[1].shape[0]
+                    valloss = (self.test(valset[0]) - valset[1]).abs().sum() / valset[1].shape[0]
                 print("Epoch: %4d\n\tTrain Loss: %6.2f"%(epoch+1, inner_loss) + (("\tVal Loss: %6.2f"%valloss) if cross_val else ""))
             self.vallosses.append(valloss)
         if cross_val:
@@ -59,4 +61,24 @@ class NeuralNetwork(object):
         for layer in self.layers:
             X = layer.forward(X)
         return X
+
+    def save_model(self, path):
+        from os import system
+        system("mkdir " + path)
+        for layer in self.layers:
+            layer.save(path)
+        self.loss_layer.save(path)
     
+    def load_model(self, path):
+        from os import listdir
+        layer_list = listdir(path)
+        layer_list.sort()
+        for layer in layer_list:
+            if layer.startswith('loss'):
+                with open(path + layer, 'r') as f:
+                    layer_type = f.readline().strip()
+                    self.loss_layer = eval(layer_type + '()')
+            else:
+                layer_type = layer.split('_')[1]
+                layer = eval(layer_type(path+layer))
+                self.layers.append(layer)
