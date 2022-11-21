@@ -1,4 +1,4 @@
-from pyflow import *
+from pyflow import Tensor
 import pickle
 t = Tensor
 
