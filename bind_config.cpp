@@ -9,6 +9,7 @@
 #include "L2Loss.hpp"
 #include "CrossEntropyLoss.hpp"
 #include "ReLU.hpp"
+#include "Sigmoid.hpp"
 
 namespace py = pybind11;
 using namespace std;
@@ -117,5 +118,12 @@ PYBIND11_MODULE(pyflow, m){
         .def("backward", &ReLU::backward)
         .def("save", &ReLU::save)
         .def("load", &ReLU::load)
+        ;
+    py::class_<Sigmoid>(m, "Sigmoid")
+        .def(py::init<>())
+        .def("forward", &Sigmoid::forward)
+        .def("backward", &Sigmoid::backward)
+        .def("save", &Sigmoid::save)
+        .def("load", &Sigmoid::load)
         ;
 }

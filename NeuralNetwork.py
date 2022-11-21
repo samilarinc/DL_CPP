@@ -3,22 +3,18 @@ import pickle
 t = Tensor
 
 class NeuralNetwork(object):
-    def __init__(self, loss_layer, dataset):
+    def __init__(self, dataset, loss_layer=None, path=None):
         self._testing_phase = False
         self.loss = list()
         self.layers = list()
         self.dataset = dataset
-        self.loss_layer = loss_layer
+        if loss_layer is not None:
+            self.loss_layer = loss_layer
+        elif path is not None:
+            self.load_model(path)
+        else:
+            raise ValueError("Must specify either loss_layer or path")
 
-    def __init__(self, dataset, path:str, load:bool): # load model
-        print("Call this constructor if you want to load a model")
-        print("Otherwise, use the convention NeuralNetwork(loss_layer, dataset)")
-        self.dataset = dataset
-        self.testing_phase = False
-        self.loss = list()
-        self.layers = list()
-        self.load_model(path)
-    
     def append_layer(self, layer):
         self.layers.append(layer)
     
