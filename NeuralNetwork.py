@@ -9,12 +9,21 @@ class NeuralNetwork(object):
         self.layers = list()
         self.dataset = dataset
         self.loss_layer = loss_layer
+
+    def __init__(self, dataset, path:str, load:bool): # load model
+        print("Call this constructor if you want to load a model")
+        print("Otherwise, use the convention NeuralNetwork(loss_layer, dataset)")
+        self.dataset = dataset
+        self.testing_phase = False
+        self.loss = list()
+        self.layers = list()
+        self.load_model(path)
     
     def append_layer(self, layer):
         self.layers.append(layer)
     
     def __forward(self):
-        X, y = self.data.next_batch()
+        X, y = self.dataset.next_batch()
         y = y[:, None, None]
         X = X[:, :, None]
         X, y = t(X.tolist()), t(y.tolist())
@@ -37,17 +46,21 @@ class NeuralNetwork(object):
         for epoch in range(epochs):
             inner_loss = 0
             iterations = 0
-            while not self.data.finished:
+            while not self.dataset.finished:
                 loss = self.__forward()
                 inner_loss += loss
                 self.__backward()
                 iterations += 1
             inner_loss /= iterations
             self.loss.append(inner_loss)
-            self.data.finished = False
+            self.dataset.finished = False
             if verbose:
                 if cross_val:
-                    valloss = (self.test(valset[0]) - valset[1]).abs().sum() / valset[1].shape[0]
+                    loss_type = self.loss_layer.__class__.__name__
+                    if loss_type == 'L1Loss':
+                        valloss = (self.test(valset[0]) - valset[1]).abs().sum() / valset[1].shape[0]
+                    elif loss_type == 'L2Loss':
+                        valloss = (self.test(valset[0]) - valset[1]).power(2).sum() / valset[1].shape[0]
                 print("Epoch: %4d\n\tTrain Loss: %6.2f"%(epoch+1, inner_loss) + (("\tVal Loss: %6.2f"%valloss) if cross_val else ""))
             self.vallosses.append(valloss)
         if cross_val:
