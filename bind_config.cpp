@@ -81,6 +81,8 @@ PYBIND11_MODULE(pyflow, m){
         .def(py::init<int, int, double, string, double, double, double>())
         .def("forward", &Dense::forward)
         .def("backward", &Dense::backward)
+        .def("save", &Dense::save)
+        .def("load", &Dense::load)
         .def_readwrite("weights", &Dense::weights)
         .def_readwrite("bias", &Dense::bias)
         .def_readwrite("trainable", &Dense::trainable)
@@ -113,5 +115,7 @@ PYBIND11_MODULE(pyflow, m){
         .def(py::init<>())
         .def("forward", &ReLU::forward)
         .def("backward", &ReLU::backward)
+        .def("save", &ReLU::save)
+        .def("load", &ReLU::load)
         ;
 }

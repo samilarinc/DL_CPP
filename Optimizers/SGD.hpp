@@ -11,6 +11,7 @@ public:
     ~SGD() = default;
     void calculate_update(Tensor&, Tensor) override;
     double getLearningRate() const;
+    double getMomentum() const;
 
     double learning_rate;
     double momentum;

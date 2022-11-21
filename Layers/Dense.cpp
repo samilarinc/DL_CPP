@@ -1,14 +1,17 @@
 #include "Dense.hpp"
+#include <fstream>
+#include <sstream>
 
 Dense::Dense(int input_size, int output_size, double lr, string opt, double momentum, double mu, double rho) {
     this->input_size = input_size;
     this->output_size = output_size;
+    this->optimizer_type = opt;
     weights = Tensor(1, output_size, input_size, 0.0, 1.0);
     bias = Tensor(1, output_size, 1, 0.0, 1.0);
     if(opt == "SGD") {
         // printf("SGD Optimizer with learning rate %f and momentum %f\n\n", lr, momentum);
-        this->optimizer = new SGD(lr);
-        this->bias_optimizer = new SGD(lr);
+        this->optimizer = new SGD(lr, momentum);
+        this->bias_optimizer = new SGD(lr, momentum);
     }
     else if(opt == "Adam") {
         // printf("Adam Optimizer with learning rate %f, mu %f and rho %f\n\n", lr, mu, rho);
@@ -74,4 +77,82 @@ Tensor Dense::backward(const Tensor& error) {
     gradient_bias = db;
     gradient_weights = dw;
     return dx;
+}
+
+void Dense::save(string path, int num) {
+    ofstream file(path + "/" + to_string(num) + ".FC");
+    if(file.is_open()) {
+        file << to_string(input_size) + " " + to_string(output_size);
+        file << endl;
+        file << optimizer_type;
+        file << endl;
+        if(optimizer_type == "SGD") {
+            SGD* sgd = (SGD *)optimizer;
+            file << to_string(sgd->getLearningRate()) + " " + to_string(sgd->getMomentum());
+            file << endl;
+        }
+        else if(optimizer_type == "Adam") {
+            Adam *adam = (Adam *)optimizer;
+            file << to_string(adam->getLearningRate()) + " " + to_string(adam->getMu()) + " " + to_string(adam->getRho());
+            file << endl;
+        }
+        for(int i = 0; i < output_size; i++) {
+            for(int j = 0; j < input_size; j++) {
+                file << weights(0, i, j) << " ";
+            }
+        }
+        file << endl;
+        for(int i = 0; i < output_size; i++) {
+            file << bias(0, i, 0) << " ";
+        }
+    }
+    file.close();
+}
+
+void Dense::load(string path, int num) {
+    ifstream file(path + "/" + to_string(num) + ".FC");
+    if(file.is_open()) {
+        string line;
+        getline(file, line);
+        istringstream iss(line);
+        iss >> input_size >> output_size;
+        getline(file, line);
+        istringstream iss2(line);
+        iss2 >> optimizer_type;
+        if(optimizer_type == "SGD") {
+            double lr, momentum;
+            getline(file, line);
+            istringstream iss3(line);
+            iss3 >> lr >> momentum;
+            optimizer = new SGD(lr, momentum);
+            bias_optimizer = new SGD(lr, momentum);
+        }
+        else if(optimizer_type == "Adam") {
+            double lr, mu, rho;
+            getline(file, line);
+            istringstream iss3(line);
+            iss3 >> lr >> mu >> rho;
+            optimizer = new Adam(lr, mu, rho);
+            bias_optimizer = new Adam(lr, mu, rho);
+        }
+        else {
+            optimizer = nullptr;
+            bias_optimizer = nullptr;
+        }
+        weights = Tensor(1, output_size, input_size);
+        bias = Tensor(1, output_size, 1);
+        getline(file, line);
+        istringstream iss3(line);
+        for(int i = 0; i < output_size; i++) {
+            for(int j = 0; j < input_size; j++) {
+                iss3 >> weights(0, i, j);
+            }
+        }
+        getline(file, line);
+        istringstream iss4(line);
+        for(int i = 0; i < output_size; i++) {
+            iss4 >> bias(0, i, 0);
+        }
+    }
+    file.close();
 }

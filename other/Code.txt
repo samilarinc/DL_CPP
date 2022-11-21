@@ -1,0 +1,1537 @@
+NeuralNetwork.py:
+
+from pyflow import *
+
+t = Tensor
+
+class NeuralNetwork(object):
+    def __init__(self, optimizer):
+        self.optimizer_str = optimizer
+        self._testing_phase = False
+        self.loss = list()
+        self.layers = list()
+        self.data = None
+        self.loss_layer = None
+    
+    def append_layer(self, layer):
+        self.layers.append(layer)
+    
+    def forward(self):
+        X, y = self.data.next_batch()
+        y = y[:, None, None]
+        X = X[:, :, None]
+        X, y = t(X.tolist()), t(y.tolist())
+        self.labels = y
+        for layer in self.layers:
+            X = layer.forward(X)
+        loss = self.loss_layer.forward(X, y)
+        return loss
+
+    def backward(self):
+        y = self.labels
+        X = self.loss_layer.backward(y)
+        for layer in reversed(self.layers):
+            X = layer.backward(X)
+    
+    def train(self, epochs, cross_val = False, valset = None, verbose = True):
+        self.vallosses = list()
+        if cross_val and not verbose:
+            raise ValueError("Cross validation must be verbose")
+        for epoch in range(epochs):
+            inner_loss = 0
+            iterations = 0
+            while not self.data.finished:
+                loss = self.forward()
+                inner_loss += loss
+                self.backward()
+                iterations += 1
+            inner_loss /= iterations
+            self.loss.append(inner_loss)
+            self.data.finished = False
+            if verbose:
+                if cross_val:
+                    valloss = (self.test(valset[0]) - valset[1]).abs().sum() / valset[1].shape[0]
+                print("Epoch: %4d\n\tTrain Loss: %6.2f"%(epoch+1, inner_loss) + (("\tVal Loss: %6.2f"%valloss) if cross_val else ""))
+            self.vallosses.append(valloss)
+        if cross_val:
+            return self.loss, self.vallosses
+        return self.loss
+            
+    def test(self, data):
+        self.testing_phase = True
+        X = t(data[:, :, None].tolist())
+        for layer in self.layers:
+            X = layer.forward(X)
+        return X
+
+    def save_model(self, path):
+        from os import system
+        system("mkdir " + path)
+        for layer in self.layers:
+            layer.save(path)
+        self.loss_layer.save(path)
+    
+    def load_model(self, path):
+        from os import listdir
+        layer_list = listdir(path)
+        layer_list.sort()
+        for layer in layer_list:
+            if layer.startswith('loss'):
+                with open(path + layer, 'r') as f:
+                    layer_type = f.readline().strip()
+                    self.loss_layer = eval(layer_type + '()')
+            else:
+                layer_type = layer.split('_')[1]
+                layer = eval(layer_type(path+layer))
+                self.layers.append(layer)
+
+data_layer.py:
+
+import pandas as pd
+import numpy as np
+
+class Dataset(object):
+    def __init__(self, data_dir, batch_size, label_name): #Habitability_score
+        self.data_dir = data_dir
+        self.batch_size = batch_size
+        self.label_name = label_name
+        self.load_data()
+        self.data_len = self.data.shape[0]
+        self.finished = False
+        self.last_loc = 0
+    
+    def __init__(self, X, y, batch_size, from_numpy=True):
+        self.data = X
+        self.labels = y
+        self.finished = False
+        self.data_len = self.data.shape[0]
+        self.batch_size = batch_size
+        self.last_loc = 0
+    
+    def load_data(self):
+        self.data = pd.read_csv(self.data_dir)
+        self.labels = self.data[self.label_name].to_numpy()
+        self.data = self.data.drop(self.label_name, axis=1).to_numpy()
+    
+    def next_batch(self):
+        if self.finished:
+            return None, None
+        if self.batch_size > self.data.shape[0]:
+            self.batch_size = self.data.shape[0]
+            print("Batch size is too large. Batch size is set to {} which is the data length.".format(self.batch_size))
+        if self.last_loc + self.batch_size >= self.data.shape[0]:
+            indices = np.arange(self.last_loc, self.data.shape[0], 1).tolist()
+            indices.extend(np.arange(0, self.batch_size - (self.data.shape[0] - self.last_loc), 1).tolist())
+            indices = np.array(indices)
+            self.last_loc = 0
+            self.finished = True
+        else:
+            indices = np.arange(self.last_loc, self.last_loc + self.batch_size, 1)
+            self.last_loc += self.batch_size
+        return self.data[indices], self.labels[indices]
+
+bind_config.cpp:
+
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <string>
+#include "Dense.hpp"
+#include "Tensor.hpp"
+#include "SGD.hpp"
+#include "BaseOptimizer.hpp"
+#include "L1Loss.hpp"
+#include "L2Loss.hpp"
+#include "CrossEntropyLoss.hpp"
+#include "ReLU.hpp"
+
+namespace py = pybind11;
+using namespace std;
+
+PYBIND11_MODULE(pyflow, m){
+    py::class_<Tensor>(m, "Tensor")
+        .def(py::init<>())
+        .def(py::init<int, int, int>())
+        .def(py::init<int, int, int, double>())
+        .def(py::init<int, int, int, double, double>())
+        .def(py::init<const Tensor&>())
+        .def(py::init<vector<vector<vector<double>>>>())
+        .def(py::init<vector<vector<double>>>())
+        .def(py::init<vector<double>>())
+        .def("__len__", &Tensor::size)
+        .def("__add__", py::overload_cast<const Tensor&>(&Tensor::operator+))
+        .def("__add__", py::overload_cast<double>(&Tensor::operator+))
+        .def("__sub__", py::overload_cast<const Tensor&>(&Tensor::operator-))
+        .def("__sub__", py::overload_cast<double>(&Tensor::operator-))
+        .def("__mul__", py::overload_cast<const Tensor&>(&Tensor::operator*))
+        .def("__mul__", py::overload_cast<double>(&Tensor::operator*))
+        .def("__truediv__", py::overload_cast<const Tensor&>(&Tensor::operator/))
+        .def("__truediv__", py::overload_cast<double>(&Tensor::operator/))
+        .def("__pow__", py::overload_cast<double>(&Tensor::power))
+        .def("__iadd__", py::overload_cast<const Tensor&>(&Tensor::operator+=))
+        .def("__iadd__", py::overload_cast<double>(&Tensor::operator+=))
+        .def("__isub__", py::overload_cast<const Tensor&>(&Tensor::operator-=))
+        .def("__isub__", py::overload_cast<double>(&Tensor::operator-=))
+        .def("__imul__", py::overload_cast<const Tensor&>(&Tensor::operator*=))
+        .def("__imul__", py::overload_cast<double>(&Tensor::operator*=))
+        .def("__itruediv__", py::overload_cast<const Tensor&>(&Tensor::operator/=))
+        .def("__itruediv__", py::overload_cast<double>(&Tensor::operator/=))
+        .def("__pow__", py::overload_cast<double>(&Tensor::power))
+        .def("power", py::overload_cast<double>(&Tensor::power))
+        .def("abs", &Tensor::abs)
+        .def("sign", &Tensor::sign)
+        .def("setitem", py::overload_cast<int, int, int, double>(&Tensor::setitem))
+        .def("setitem", py::overload_cast<int, int, const Tensor&>(&Tensor::setitem))
+        .def("setitem", py::overload_cast<int, const Tensor&>(&Tensor::setitem))
+        .def("rows", &Tensor::getRows)
+        .def("cols", &Tensor::getCols)
+        .def("batch_size", &Tensor::getBatchsize)
+        .def("__repr__", &Tensor::toString)
+        .def("transpose", &Tensor::transpose)
+        .def("dot_product", &Tensor::dot_product)
+        .def_readonly("shape", &Tensor::shape)
+        .def("copy", &Tensor::copy)
+        .def("sum", &Tensor::sum)
+        .def("tolist", &Tensor::tolist)
+        .def("getitem", py::overload_cast<int>(&Tensor::getitem, py::const_))
+        .def("getitem", py::overload_cast<int, int>(&Tensor::getitem, py::const_))
+        .def("getitem", py::overload_cast<int, int, int>(&Tensor::getitem, py::const_))
+        .def("__call__", [](Tensor& t, int batch_size, int row, int col) {
+            return t(batch_size, row, col);
+        })
+        .def("__call__", [](Tensor& t, int batch_size, int row, int col) {
+            return t(batch_size, row, col);
+        })
+        .def("__repr__", [](Tensor& t) {
+            return t.toString();
+        })
+        ;
+    
+    py::class_<Dense>(m, "FullyConnected")
+        .def(py::init<>())
+        .def(py::init<int, int>())
+        .def(py::init<int, int, double, string>())
+        .def(py::init<int, int, double, string, double>())
+        .def(py::init<int, int, double, string, double, double>())
+        .def(py::init<int, int, double, string, double, double, double>())
+        .def("forward", &Dense::forward)
+        .def("backward", &Dense::backward)
+        .def_readwrite("weights", &Dense::weights)
+        .def_readwrite("bias", &Dense::bias)
+        .def_readwrite("trainable", &Dense::trainable)
+        .def_readwrite("gradient_weights", &Dense::gradient_weights)
+        .def_readwrite("gradient_bias", &Dense::gradient_bias)
+        ;
+
+    py::class_<SGD>(m, "SGD")
+        .def(py::init<double>())
+        .def("calculate_update", &SGD::calculate_update)
+        .def("learning_rate", &SGD::getLearningRate)
+        ;
+
+    py::class_<L1Loss>(m, "L1Loss")
+        .def(py::init<>())
+        .def("forward", &L1Loss::forward)
+        .def("backward", &L1Loss::backward)
+        ;
+    py::class_<L2Loss>(m, "L2Loss")
+        .def(py::init<>())
+        .def("forward", &L2Loss::forward)
+        .def("backward", &L2Loss::backward)
+        ;
+    py::class_<CrossEntropyLoss>(m, "CrossEntropyLoss")
+        .def(py::init<>())
+        .def("forward", &CrossEntropyLoss::forward)
+        .def("backward", &CrossEntropyLoss::backward)
+        ;
+    py::class_<ReLU>(m, "ReLU")
+        .def(py::init<>())
+        .def("forward", &ReLU::forward)
+        .def("backward", &ReLU::backward)
+        ;
+}
+
+Tensor.hpp
+#ifndef TENSOR_HPP
+#define TENSOR_HPP
+
+#include <tuple>
+#include <vector>
+#include <string>
+#include <math.h>
+#include <random>
+
+using namespace std;
+
+class Tensor {
+public:
+    Tensor();
+    Tensor(int, int, int);
+    Tensor(int, int, int, double);
+    Tensor(int, int, int, double, double); 
+    Tensor(const Tensor&);
+    Tensor(vector<vector<vector<double>>>);
+    Tensor(vector<vector<double>>);
+    Tensor(vector<double>);
+    ~Tensor();
+    Tensor transpose();
+    Tensor dot_product(const Tensor&);
+    Tensor& operator=(const Tensor&);
+    double& operator()(int, int, int);
+    double operator()(int, int, int) const;
+    Tensor operator+(const Tensor&);
+    Tensor operator-(const Tensor&);
+    Tensor operator*(const Tensor&);
+    Tensor operator/(const Tensor&);
+    Tensor& operator+=(const Tensor&);
+    Tensor& operator-=(const Tensor&);
+    Tensor& operator*=(const Tensor&);
+    Tensor& operator/=(const Tensor&);
+    Tensor operator+(double);
+    Tensor operator-(double);
+    Tensor operator*(double);
+    Tensor operator/(double);
+    Tensor& operator+=(double);
+    Tensor& operator-=(double);
+    Tensor& operator*=(double);
+    Tensor& operator/=(double);
+    Tensor power(double);
+    int getRows() const;
+    int getCols() const;
+    int getBatchsize() const;
+    string toString() const;
+    double sum() const;
+    Tensor sign() const;
+    Tensor abs() const;
+    Tensor copy() const;
+    Tensor getitem(int) const;
+    Tensor getitem(int, int) const;
+    double getitem(int, int, int) const;
+    void setitem(int, int, int, double);
+    void setitem(int, int, double);
+    void setitem(int, int, const Tensor&);
+    void setitem(int, const Tensor&);
+    int size() const;
+    vector<vector<vector<double>>> tolist() const;
+    tuple<int, int, int> shape;
+// private:
+    int rows;
+    int cols;
+    int batch_size;
+    double* data;
+};
+
+#endif // TENSOR_HPP
+
+Tensor.cpp
+
+#include "Tensor.hpp"
+#include <exception>
+
+Tensor::Tensor() {
+    batch_size = 0;
+    rows = 0;
+    cols = 0;
+    data = nullptr;
+    tuple<int, int, int> shape = make_tuple(0, 0, 0);
+}
+
+Tensor::Tensor(int batch_size, int rows, int cols) {
+    this->batch_size = batch_size;
+    this->rows = rows;
+    this->cols = cols;
+    this->data = new double[batch_size * rows * cols]();
+    this->shape = make_tuple(batch_size, rows, cols);
+}
+
+Tensor::Tensor(int batch_size, int rows, int cols, double constant){
+    this->batch_size = batch_size;
+    this->rows = rows;
+    this->cols = cols;
+    this->shape = make_tuple(batch_size, rows, cols);
+    data = new double[batch_size * rows * cols]();
+    for(int i = 0; i < batch_size * rows * cols; i++){
+        data[i] = constant;
+    }
+}
+
+Tensor::Tensor(int batch_size, int rows, int cols, double min, double max){ 
+    this->batch_size = batch_size;
+    this->rows = rows;
+    this->cols = cols;
+    this->shape = make_tuple(batch_size, rows, cols);
+    data = new double[batch_size * rows * cols]();
+    random_device rd;
+    mt19937 gen(rd());
+    uniform_real_distribution<> dis(min, max);
+    for(int i = 0; i < batch_size * rows * cols; i++){
+        data[i] = dis(gen);
+    }
+}
+
+Tensor::Tensor(vector<vector<vector<double>>> data) {
+    batch_size = data.size();
+    rows = data[0].size();
+    cols = data[0][0].size();
+    this->shape = make_tuple(batch_size, rows, cols);
+    this->data = new double[batch_size * rows * cols]();
+    for(int i = 0; i < batch_size; i++) {
+        for(int j = 0; j < rows; j++) {
+            for(int k = 0; k < cols; k++) {
+                this->data[i * rows * cols + j * cols + k] = data[i][j][k];
+            }
+        }
+    }
+}
+
+Tensor::Tensor(vector<vector<double>> data) {
+    batch_size = 1;
+    rows = data.size();
+    cols = data[0].size();
+    this->shape = make_tuple(batch_size, rows, cols);
+    this->data = new double[batch_size * rows * cols]();
+    for(int i = 0; i < rows; i++) {
+        for(int j = 0; j < cols; j++) {
+            this->data[i * cols + j] = data[i][j];
+        }
+    }
+}
+
+Tensor::Tensor(vector<double> data) {
+    batch_size = 1;
+    rows = data.size();
+    cols = 1;
+    this->shape = make_tuple(batch_size, rows, cols);
+    this->data = new double[batch_size * rows * cols]();
+    for(int i = 0; i < rows; i++) {
+        this->data[i] = data[i];
+    }
+}
+
+Tensor::Tensor(const Tensor& other) {
+    batch_size = other.batch_size;
+    rows = other.rows;
+    cols = other.cols;
+    this->shape = make_tuple(batch_size, rows, cols);
+    data = new double[batch_size * rows * cols];
+    for (int i = 0; i < batch_size * rows * cols; i++) {
+        data[i] = other.data[i];
+    }
+}
+
+Tensor::~Tensor() {
+    delete[] data;
+}
+
+Tensor& Tensor::operator=(const Tensor& other) {
+    if (this != &other) {
+        delete[] data;
+        batch_size = other.batch_size;
+        rows = other.rows;
+        cols = other.cols;
+        data = new double[batch_size * rows * cols];
+        for (int i = 0; i < batch_size * rows * cols; i++) {
+            data[i] = other.data[i];
+        }
+    }
+    return *this;
+}
+
+double& Tensor::operator()(int batch, int row, int col) {
+    return data[batch * rows * cols + row * cols + col];
+}
+
+double Tensor::operator()(int batch, int row, int col) const {
+    return data[batch * rows * cols + row * cols + col];
+}
+
+Tensor Tensor::operator+(const Tensor& other) {
+    if (batch_size != other.batch_size || rows != other.rows || cols != other.cols) {
+        throw invalid_argument("Dimensions of the two tensors must be equal.");
+    }
+    Tensor result(batch_size, rows, cols);
+    for (int i = 0; i < batch_size * rows * cols; i++) {
+        result.data[i] = data[i] + other.data[i];
+    }
+    return result;
+}
+
+Tensor Tensor::operator-(const Tensor& other) {
+    if (batch_size != other.batch_size || rows != other.rows || cols != other.cols) {
+        throw invalid_argument("Dimensions of the two tensors must be equal.");
+    }
+    Tensor result(batch_size, rows, cols);
+    for (int i = 0; i < batch_size * rows * cols; i++) {
+        result.data[i] = data[i] - other.data[i];
+    }
+    return result;
+}
+
+Tensor Tensor::operator*(const Tensor& other) {
+    if (batch_size != other.batch_size || rows != other.rows || cols != other.cols) {
+        throw invalid_argument("Dimensions of the two tensors must be equal.");
+    }
+    Tensor result(batch_size, rows, cols);
+    for (int i = 0; i < batch_size * rows * cols; i++) {
+        result.data[i] = data[i] * other.data[i];
+    }
+    return result;
+}
+
+Tensor Tensor::operator/(const Tensor& other) {
+    if (batch_size != other.batch_size || rows != other.rows || cols != other.cols) {
+        throw invalid_argument("Dimensions of the two tensors must be equal.");
+    }
+    Tensor result(batch_size, rows, cols);
+    for (int i = 0; i < batch_size * rows * cols; i++) {
+        if(other.data[i] == 0){
+            result.data[i] = data[i] / (other.data[i] + 1e-9);
+        }
+        else{
+            result.data[i] = data[i] / other.data[i];
+        }
+    }
+    return result;
+}
+
+Tensor Tensor::operator+(double constant) {
+    Tensor result(batch_size, rows, cols);
+    for (int i = 0; i < batch_size * rows * cols; i++) {
+        result.data[i] = data[i] + constant;
+    }
+    return result;
+}
+
+Tensor Tensor::operator-(double constant) {
+    Tensor result(batch_size, rows, cols);
+    for (int i = 0; i < batch_size * rows * cols; i++) {
+        result.data[i] = data[i] - constant;
+    }
+    return result;
+}
+
+Tensor Tensor::operator*(double constant) {
+    Tensor result(batch_size, rows, cols);
+    for (int i = 0; i < batch_size * rows * cols; i++) {
+        result.data[i] = data[i] * constant;
+    }
+    return result;
+}
+
+Tensor Tensor::operator/(double constant) {
+    Tensor result(batch_size, rows, cols);
+    for (int i = 0; i < batch_size * rows * cols; i++) {
+        result.data[i] = data[i] / constant;
+    }
+    return result;
+}
+
+Tensor Tensor::power(double exponent) {
+    Tensor result(batch_size, rows, cols);
+    for (int i = 0; i < batch_size * rows * cols; i++) {
+        result.data[i] = pow(data[i], exponent);
+    }
+    return result;
+}
+
+int Tensor::getRows() const {
+    return rows;
+}
+
+int Tensor::getCols() const {
+    return cols;
+}
+
+int Tensor::getBatchsize() const {
+    return batch_size;
+}
+
+string Tensor::toString() const {
+    string output = "";
+    for (int i = 0; i < batch_size; i++) {
+        for (int j = 0; j < rows; j++) {
+            for (int k = 0; k < cols; k++) {
+                output += to_string(data[i * rows * cols + j * cols + k]) + " ";
+            }
+            if(j != rows - 1) {
+                output += "\n";
+            }
+        }
+        if(i != batch_size - 1) {
+            output += "\n\n";
+        }
+    }
+    return output;
+}
+
+Tensor Tensor::transpose(){
+    Tensor output(batch_size, cols, rows);
+    for(int i = 0; i < batch_size; i++){
+        for(int j = 0; j < rows; j++){
+            for(int k = 0; k < cols; k++){
+                output(i, k, j) = (*this)(i, j, k);
+            }
+        }
+    }
+    return output;
+}
+
+Tensor Tensor::dot_product(const Tensor& other){
+    if(cols != other.rows){
+        printf("Error: dot_product: cols != other.rows");
+        return Tensor();
+    }
+    Tensor output(batch_size, rows, other.cols);
+    for(int i = 0; i < batch_size; i++){
+        for(int j = 0; j < rows; j++){
+            for(int k = 0; k < other.cols; k++){
+                for(int l = 0; l < cols; l++){
+                    output(i, j, k) += (*this)(i, j, l) * other(i, l, k);
+                }
+            }
+        }
+    }
+    return output;
+}
+
+double Tensor::sum() const{
+    double output = 0;
+    for(int i = 0; i < batch_size * rows * cols; i++){
+        output += data[i];
+    }
+    return output;
+}
+
+Tensor Tensor::sign() const{
+    Tensor output(batch_size, rows, cols);
+    for(int i = 0; i < batch_size * rows * cols; i++){
+        if(data[i] > 0){
+            output.data[i] = 1;
+        } else if(data[i] < 0){
+            output.data[i] = -1;
+        } else {
+            output.data[i] = 0;
+        }
+    }
+    return output;
+}
+
+Tensor Tensor::abs() const{
+    Tensor output(batch_size, rows, cols);
+    for(int i = 0; i < batch_size * rows * cols; i++){
+        output.data[i] = data[i] > 0 ? data[i] : -data[i];
+    }
+    return output;
+}
+
+Tensor Tensor::copy() const{
+    Tensor output(batch_size, rows, cols);
+    for(int i = 0; i < batch_size * rows * cols; i++){
+        output.data[i] = data[i];
+    }
+    return output;
+}
+
+Tensor Tensor::getitem(int num) const{
+    if(batch_size == 1) {
+        Tensor output(1, cols, 1);
+        for(int i = 0; i < cols; i++){
+            output(0, i, 0) = (*this)(0, num, i);
+        }
+        return output;
+    }
+    Tensor output(1, rows, cols);
+    for(int i = 0; i < rows; i++){
+        for(int j = 0; j < cols; j++){
+            output(0, i, j) = (*this)(num, i, j);
+        }
+    }
+    return output;
+}
+
+Tensor Tensor::getitem(int num1, int num2) const{
+    Tensor output(batch_size, 1, 1);
+    for(int i = 0; i < batch_size; i++){
+        output(i, 0, 0) = (*this)(i, num1, num2);
+    }
+    return output;
+}
+
+double Tensor::getitem(int num1, int num2, int num3) const{
+    return (*this)(num1, num2, num3);
+}
+
+void Tensor::setitem(int num, const Tensor& other){
+    if(batch_size == 1) {
+        for(int i = 0; i < cols; i++){
+            (*this)(0, num, i) = other(0, i, 0);
+        }
+        return;
+    }
+    for(int i = 0; i < rows; i++){
+        for(int j = 0; j < cols; j++){
+            (*this)(num, i, j) = other(0, i, j);
+        }
+    }
+}
+
+void Tensor::setitem(int num1, int num2, const Tensor& other){
+    for(int i = 0; i < batch_size; i++){
+        (*this)(i, num1, num2) = other(i, 0, 0);
+    }
+}
+
+void Tensor::setitem(int num1, int num2, double value){
+    for(int i = 0; i < batch_size; i++){
+        (*this)(i, num1, num2) = value;
+    }
+}
+
+void Tensor::setitem(int num1, int num2, int num3, double value){
+    (*this)(num1, num2, num3) = value;
+}
+
+vector<vector<vector<double>>> Tensor::tolist() const{
+    vector<vector<vector<double>>> output(batch_size, vector<vector<double>>(rows, vector<double>(cols)));
+    for(int i = 0; i < batch_size; i++){
+        for(int j = 0; j < rows; j++){
+            for(int k = 0; k < cols; k++){
+                output[i][j][k] = (*this)(i, j, k);
+            }
+        }
+    }
+    return output;
+}
+
+Tensor& Tensor::operator+=(const Tensor& tensor2){
+    if(batch_size != tensor2.batch_size || rows != tensor2.rows || cols != tensor2.cols){
+        printf("Error: operator+=: batch_size != tensor2.batch_size || rows != tensor2.rows || cols != tensor2.cols");
+        return *this;
+    }
+    for(int i = 0; i < batch_size * rows * cols; i++){
+        data[i] += tensor2.data[i];
+    }
+    return *this;
+}
+
+Tensor& Tensor::operator-=(const Tensor& tensor2){
+    if(batch_size != tensor2.batch_size || rows != tensor2.rows || cols != tensor2.cols){
+        printf("Error: operator-=: batch_size != tensor2.batch_size || rows != tensor2.rows || cols != tensor2.cols");
+        return *this;
+    }
+    for(int i = 0; i < batch_size * rows * cols; i++){
+        data[i] -= tensor2.data[i];
+    }
+    return *this;
+}
+
+Tensor& Tensor::operator*=(const Tensor& tensor2){
+    if(batch_size != tensor2.batch_size || rows != tensor2.rows || cols != tensor2.cols){
+        printf("Error: operator*=: batch_size != tensor2.batch_size || rows != tensor2.rows || cols != tensor2.cols");
+        return *this;
+    }
+    for(int i = 0; i < batch_size * rows * cols; i++){
+        data[i] *= tensor2.data[i];
+    }
+    return *this;
+}
+
+Tensor& Tensor::operator/=(const Tensor& tensor2){
+    if(batch_size != tensor2.batch_size || rows != tensor2.rows || cols != tensor2.cols){
+        printf("Error: operator/=: batch_size != tensor2.batch_size || rows != tensor2.rows || cols != tensor2.cols");
+        return *this;
+    }
+    for(int i = 0; i < batch_size * rows * cols; i++){
+        if(tensor2.data[i] == 0){
+            data[i] /= tensor2.data[i] + 1e-10;            
+        }
+        else{
+            data[i] /= tensor2.data[i];
+        }
+    }
+    return *this;
+}
+
+Tensor& Tensor::operator+=(double value){
+    for(int i = 0; i < batch_size * rows * cols; i++){
+        data[i] += value;
+    }
+    return *this;
+}
+
+Tensor& Tensor::operator-=(double value){
+    for(int i = 0; i < batch_size * rows * cols; i++){
+        data[i] -= value;
+    }
+    return *this;
+}
+
+Tensor& Tensor::operator*=(double value){
+    for(int i = 0; i < batch_size * rows * cols; i++){
+        data[i] *= value;
+    }
+    return *this;
+}
+
+Tensor& Tensor::operator/=(double value){
+    if(value == 0){
+        value += 1e-10;
+    }
+    for(int i = 0; i < batch_size * rows * cols; i++){
+        data[i] /= value;
+    }
+    return *this;
+}
+
+int Tensor::size() const{
+    return batch_size * rows * cols;
+}
+
+Dense.cpp
+
+#include "Dense.hpp"
+
+Dense::Dense(int input_size, int output_size, double lr, string opt, double momentum, double mu, double rho) {
+    this->input_size = input_size;
+    this->output_size = output_size;
+    weights = Tensor(1, output_size, input_size, 0.0, 1.0);
+    bias = Tensor(1, output_size, 1, 0.0, 1.0);
+    if(opt == "SGD") {
+        // printf("SGD Optimizer with learning rate %f and momentum %f\n\n", lr, momentum);
+        this->optimizer = new SGD(lr);
+        this->bias_optimizer = new SGD(lr);
+    }
+    else if(opt == "Adam") {
+        // printf("Adam Optimizer with learning rate %f, mu %f and rho %f\n\n", lr, mu, rho);
+        this->optimizer = new Adam(lr, mu, rho);
+        this->bias_optimizer = new Adam(lr, mu, rho);
+    }
+    else {
+        // printf("No optimizer specified, using SGD with learning rate %f and momentum %f\n\n", lr, momentum);
+        this->optimizer = nullptr;
+        this->bias_optimizer = nullptr;
+    }
+}
+
+Dense::~Dense() = default;
+
+Tensor Dense::getWeights() const {
+    return weights;
+}
+
+Tensor Dense::getBias() const {
+    return bias;
+}
+
+Tensor Dense::forward(const Tensor& input) { // batch size should be 1! Data should be flattened!
+    Tensor output = Tensor(input.getBatchsize(), output_size, 1);
+    last_input = Tensor(input);
+    for(int i = 0; i < input.getBatchsize(); i++) {
+        for(int j = 0; j < output_size; j++) {
+            for(int k = 0; k < input_size; k++) {
+                output(i, j, 0) += input(i, k, 0) * weights(0, j, k);
+            }
+        output(i, j, 0) += bias(0, j, 0);
+        }
+    }
+    return output;
+}
+
+Tensor Dense::backward(const Tensor& error) {
+    int batch_size = error.getBatchsize();
+    Tensor dx(batch_size, input_size, 1);
+    Tensor dw(1, output_size, input_size);
+    Tensor db(1, output_size, 1);
+    
+    for(int i = 0; i < batch_size; i++) {
+        for(int j = 0; j < output_size; j++) {
+            for(int k = 0; k < input_size; k++) {
+                dw(0, j, k) += error(i, j, 0) * last_input(i, k, 0);
+                dx(i, k, 0) += error(i, j, 0) * weights(0, j, k);
+            }
+            db(0, j, 0) += error(i, j, 0);
+        }
+    }
+    dw = dw / batch_size;
+    db = db / batch_size;
+
+    if(optimizer != nullptr) {
+        optimizer->calculate_update(weights, dw);
+    }
+    if(bias_optimizer != nullptr) {
+        bias_optimizer->calculate_update(bias, db);
+    }
+
+    gradient_bias = db;
+    gradient_weights = dw;
+    return dx;
+}
+
+Dense.hpp
+
+#ifndef DENSE_HPP
+#define DENSE_HPP
+
+#include "Tensor.hpp"
+#include "BaseLayer.hpp"
+#include "BaseOptimizer.hpp"
+#include "SGD.hpp"
+#include "Adam.hpp"
+#include <string>
+
+class Dense : public BaseLayer {
+public:
+    Dense() = default;
+    Dense(int input_size, int output_size, double lr, string opt, double momentum, double mu, double rho);
+    Dense(int input_size, int output_size) : Dense(input_size, output_size, 0, "NULL", 0, 0, 0) {};
+    Dense(int input_size, int output_size, double lr, string opt) : Dense(input_size, output_size, lr, opt, 0, 0, 0) {};
+    Dense(int input_size, int output_size, double lr, string opt, double momentum) : Dense(input_size, output_size, lr, opt, momentum, 0, 0) {};
+    Dense(int input_size, int output_size, double lr, string opt, double mu, double rho) : Dense(input_size, output_size, lr, opt, 0, mu, rho) {};
+    ~Dense();
+    Tensor getWeights() const;
+    Tensor getBias() const;
+    Tensor forward(const Tensor&) override;
+    Tensor backward(const Tensor&) override;
+    bool trainable = true;
+    // void setOptimizer(BaseOptimizer*);
+    // BaseOptimizer* getOptimizer() const;
+    Tensor gradient_weights;
+    Tensor gradient_bias;
+// private:
+    int input_size;
+    int output_size;
+    Tensor weights;
+    Tensor bias;
+    Tensor last_input;
+    BaseOptimizer* optimizer = nullptr;
+    BaseOptimizer* bias_optimizer = nullptr;
+};
+#endif // DENSE_HPP
+
+BaseLayer.hpp
+
+#ifndef BASELAYER_HPP
+#define BASELAYER_HPP
+
+#include "Tensor.hpp"
+
+class BaseLayer {
+public:
+    BaseLayer() = default;
+    virtual ~BaseLayer() = default;
+    virtual Tensor forward(const Tensor&) = 0;
+    virtual Tensor backward(const Tensor&) = 0;
+    bool trainable = false;
+};
+#endif
+
+ReLU.cpp
+
+#include "ReLU.hpp"
+
+ReLU::ReLU() {
+    trainable = false;
+}
+
+ReLU::~ReLU() {
+    // if(last_input.data != nullptr) {
+    //     free(last_input.data);
+    // }
+}
+
+Tensor ReLU::forward(const Tensor& input) {
+    Tensor output = Tensor(input.getBatchsize(), input.getRows(), input.getCols());
+    last_input = Tensor(input);
+    for(int i = 0; i < input.getBatchsize(); i++) {
+        for(int j = 0; j < input.getRows(); j++) {
+            for(int k = 0; k < input.getCols(); k++) {
+                output(i, j, k) = input(i, j, k) > 0.0 ? input(i, j, k) : 0.0;
+            }
+        }
+    }
+    return output;
+}
+
+Tensor ReLU::backward(const Tensor& error) {
+    Tensor output = Tensor(last_input.getBatchsize(), last_input.getRows(), last_input.getCols());
+    for(int i = 0; i < last_input.getBatchsize(); i++) {
+        for(int j = 0; j < last_input.getRows(); j++) {
+            for(int k = 0; k < last_input.getCols(); k++) {
+                output(i, j, k) = last_input(i, j, k) > 0.0 ? error(i, j, k) : 0.0;
+            }
+        }
+    }
+    return output;
+}
+
+ReLU.hpp
+
+#ifndef RELU_HPP
+#define RELU_HPP
+
+#include "BaseLayer.hpp"
+
+class ReLU : public BaseLayer {
+    public:
+        ReLU();
+        ~ReLU();
+        Tensor forward(const Tensor&) override;
+        Tensor backward(const Tensor&) override;
+
+        Tensor last_input;
+};
+
+#endif
+
+
+L1Loss.cpp
+
+#include "L1Loss.hpp"
+
+L1Loss::~L1Loss() {
+    // if(last_input.data != nullptr) {
+    //     free(last_input.data);
+    // }
+}
+
+double L1Loss::forward(Tensor& output, const Tensor& target) {
+    last_input = output;
+    return (output - target).abs().sum() / output.getBatchsize();
+}
+
+Tensor L1Loss::backward(const Tensor& target) {
+    return (last_input - target).sign() / last_input.getBatchsize();
+}
+
+L1Loss.hpp
+
+#ifndef L1LOSS_HPP
+#define L1LOSS_HPP
+
+#include "Tensor.hpp"
+#include "Loss.hpp"
+
+class L1Loss : public Loss{
+public:
+    L1Loss() = default;
+    ~L1Loss();
+    double forward(Tensor&, const Tensor&) override;
+    Tensor backward(const Tensor&) override;
+
+    Tensor last_input;
+};
+
+#endif // L1LOSS_HPP 
+
+L2Loss.cpp
+
+#include "L2Loss.hpp"
+
+L2Loss::~L2Loss() {
+    // if(last_input.data != nullptr) {
+    //     free(last_input.data);
+    // }
+}
+
+double L2Loss::forward(Tensor& output, const Tensor& target) {
+    last_input = output.copy();
+    return (output - target).power(2).sum() / output.getBatchsize();
+}
+
+Tensor L2Loss::backward(const Tensor& target) {
+    return (last_input - target) * 2.0 / last_input.getBatchsize();
+}
+
+L2Loss.hpp
+
+#ifndef L2LOSS_HPP
+#define L2LOSS_HPP
+
+#include "Tensor.hpp"
+#include "Loss.hpp"
+
+class L2Loss : public Loss{
+public:
+    L2Loss() = default;
+    ~L2Loss();
+    double forward(Tensor&, const Tensor&) override;
+    Tensor backward(const Tensor&) override;
+
+    Tensor last_input;
+};
+
+#endif // L2LOSS_HPP 
+
+Loss.hpp
+
+#ifndef LOSS_HPP
+#define LOSS_HPP
+
+#include "Tensor.hpp"
+
+class Loss{
+public:
+    Loss() = default;
+    virtual ~Loss() = default;
+    virtual double forward(Tensor&, const Tensor&) = 0;
+    virtual Tensor backward(const Tensor&) = 0;
+
+    Tensor last_input;
+};
+
+#endif // LOSS_HPP
+
+Adam.hpp
+#ifndef ADAM_HPP
+#define ADAM_HPP
+
+#include "Tensor.hpp"
+#include "BaseOptimizer.hpp"
+
+class Adam : public BaseOptimizer
+{
+public:
+    Adam(double, double, double);
+    void calculate_update(Tensor&, Tensor) override;
+    double getLearningRate() const;
+    double getMu() const;
+    double getRho() const;
+
+    double lr;
+    double mu;
+    double rho;
+    int k;
+    Tensor v;
+    Tensor r;
+};
+
+#endif
+
+Adam.cpp
+
+#include "Adam.hpp"
+#include <math.h>
+
+#define EPSILON 1e-8
+
+Adam::Adam(double lr, double mu, double rho) : lr(lr), mu(mu), rho(rho), k(1) {}
+
+void Adam::calculate_update(Tensor& weights, Tensor grad) {
+    if(v.getRows() == 0)
+    {
+        v = Tensor(weights.getBatchsize(), weights.getRows(), weights.getCols(), 0.0);
+        r = Tensor(weights.getBatchsize(), weights.getRows(), weights.getCols(), 0.0);
+    }
+    v = v * mu + grad * (1 - mu);
+    r = r * rho + grad.power(2) * (1 - rho);
+    Tensor v_hat = v / (1 - pow(mu, k));
+    Tensor r_hat = r / (1 - pow(rho, k));
+    k++;
+    weights = weights - ((v_hat * lr) / (r_hat.power(0.5) + EPSILON));
+}
+
+double Adam::getLearningRate() const {
+    return lr;
+}
+
+double Adam::getMu() const {
+    return mu;
+}
+
+double Adam::getRho() const {
+    return rho;
+}
+
+SGD.cpp
+
+
+#include "SGD.hpp"
+
+SGD::SGD(double learning_rate) {
+    this->learning_rate = learning_rate;
+    this->momentum = 0.0;
+    this->velocity = Tensor();
+}
+
+SGD::SGD(double learning_rate, double momentum) {
+    this->learning_rate = learning_rate;
+    this->momentum = momentum;
+    this->velocity = Tensor(0, 0, 0);
+}
+
+void SGD::calculate_update(Tensor& weights, Tensor gradient_weights) {
+    if(this->momentum != 0.0) {
+        if(this->velocity.getRows() == 0) { // Initialize velocity first time
+            this->velocity = Tensor(gradient_weights); 
+        }
+        this->velocity = this->velocity * this->momentum + gradient_weights;
+        weights = weights - this->velocity * this->learning_rate;
+    }
+    else {
+        weights = weights - gradient_weights * this->learning_rate;
+    }
+}
+
+double SGD::getLearningRate() const {
+    return this->learning_rate;
+}
+
+
+SGD.hpp
+
+#ifndef SGD_HPP
+#define SGD_HPP
+
+#include "BaseOptimizer.hpp"
+#include "Tensor.hpp"
+
+class SGD : public BaseOptimizer {
+public:
+    SGD(double);
+    SGD(double, double);
+    ~SGD() = default;
+    void calculate_update(Tensor&, Tensor) override;
+    double getLearningRate() const;
+
+    double learning_rate;
+    double momentum;
+    Tensor velocity;
+};
+
+#endif
+
+BaseOptimizer.hpp
+
+#ifndef BASEOPTIMIZER_HPP
+#define BASEOPTIMIZER_HPP
+
+#include "Tensor.hpp"
+
+class BaseOptimizer {
+public:
+    BaseOptimizer() = default;
+    // BaseOptimizer* clone() const;
+    virtual ~BaseOptimizer() = default;
+    virtual void calculate_update(Tensor&, Tensor) = 0;
+};
+
+#endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+COLAB CODE: 
+
+
+# -*- coding: utf-8 -*-
+"""EEE485_DataPreparation.ipynb
+
+Automatically generated by Colaboratory.
+
+Original file is located at
+    https://colab.research.google.com/drive/1zhUzifCTptyGEVU4So2ku8Wot9tgLbgn
+
+# Data Preparation
+
+## Download Data from Kaggle
+"""
+
+with open('kaggle.json', 'w') as f:
+    f.write('{"username":"amilarn","key":"de2d86a43c3832fa525ac3c32a1fc534"}')
+!pip install -q kaggle
+!mkdir -p ~/.kaggle
+!cp kaggle.json ~/.kaggle/
+!ls ~/.kaggle
+!chmod 600 /root/.kaggle/kaggle.json
+!rm -r sample_data
+!kaggle datasets download -d ifteshanajnin/get-a-room-ml-hackathon-by-hackerearth
+!unzip get-a-room-ml-hackathon-by-hackerearth.zip -d .
+!rm get-a-room-ml-hackathon-by-hackerearth.zip test.csv sample_submission.csv kaggle.json
+
+"""## Import Numpy and Pandas
+
+> Girintili blok
+
+
+"""
+
+import numpy as np
+import pandas as pd
+import seaborn as sns
+
+"""## Prepare Data with Categorical as One-Hot Encoded and Fill NaN Values"""
+
+class DataPrep(object):
+    def __init__(self, df, y):
+        self.df = df.copy()
+        self.y = y.copy()
+        self.n_data = df.shape[0]
+        self.arrs = []
+        self.cols = []
+        self.nans = []
+    
+    def search_nan(self):
+        for i in self.df:
+            for j in self.df[i]:
+                if j != j:
+                    self.nans.append(i)
+                    break
+
+    def train_test_split(self, test_size=0.2):
+        if self.prepared_df is not None:
+            n_train = int(self.n_data*(1-test_size))
+            arr_data = self.prepared_df.to_numpy()
+            arr_y = self.y
+            np.random.seed(31)
+            p = np.random.permutation(len(self.y))
+            arr_data = arr_data[p]
+            arr_y = arr_y[p]
+            return arr_data[:n_train], arr_y[:n_train], arr_data[n_train:], arr_y[n_train:]
+        else:
+            print("Run prepare() first!!!")
+        
+    def fill_categorical_nan_and_one_hot_encode(self, col):
+        arr = self.df[col].to_numpy()
+        dct = dict()
+        nan_ind = []
+
+        for i in range(len(arr)):
+            element = arr[i]
+            if isinstance(element, str) and element != 'nan':
+                try:
+                    dct[element] += 1
+                except:
+                    dct[element] = 1
+            else:
+                nan_ind.append(i)
+
+        nonnan_len = len(arr) - len(nan_ind)
+        for i in dct:
+            dct[i] = dct[i]/nonnan_len
+        for i in nan_ind:
+            # arr[i] = np.random.choice(list(dct.keys()), p=list(dct.values()))
+            arr[i] = "nan"
+        freq_arr = np.zeros(len(dct.keys()))
+        uni_vals = np.unique(arr).tolist()
+        uni_vals.remove("nan")
+        encoded_arr = np.zeros((self.n_data, len(uni_vals)))
+        encod_dict = dict()
+        for i in range(len(uni_vals)):
+            encod_dict[uni_vals[i]] = i
+        for i in range(len(freq_arr)):
+            freq_arr[i] = dct[uni_vals[i]]
+        for i in range(self.n_data):
+            if arr[i] == "nan":
+                encoded_arr[i] = freq_arr.copy()
+            else:
+                encoded_arr[i][encod_dict[arr[i]]] = 1
+        return encoded_arr, encod_dict
+
+    def fill_numerical_nan(self, col):
+        return self.df[col].fillna(self.df[col].mean())
+
+    def one_hot_encode_not_nan(self, col):
+        arr = self.df[col].to_numpy()
+        dct = dict()
+
+        for i in range(len(arr)):
+            element = arr[i]
+            try:
+                dct[element] += 1
+            except:
+                dct[element] = 1
+
+        uni_vals = np.unique(arr).tolist()
+        encoded_arr = np.zeros((self.n_data, len(uni_vals)))
+        encod_dict = dict()
+        for i in range(len(uni_vals)):
+            encod_dict[uni_vals[i]] = i
+        for i in range(self.n_data):
+            encoded_arr[i][encod_dict[arr[i]]] = 1
+        return encoded_arr, encod_dict
+
+    def normalize_numerical(self, arr):
+        return (arr - arr.mean())/arr.std()
+
+    def prepare(self):
+        d_types = self.df.dtypes
+        self.search_nan()
+        for i in self.df:
+            if i in self.nans:
+                if d_types[i] == "object":
+                    ret_tuple = self.fill_categorical_nan_and_one_hot_encode(i)
+                    for k in ret_tuple[0].T:
+                        self.arrs.append(k)
+                    for j in ret_tuple[1]:
+                        self.cols.append(i+'_'+j)
+                else:
+                    self.arrs.append(self.normalize_numerical(self.fill_numerical_nan(i)))
+                    self.cols.append(i)
+            else:
+                if d_types[i] == "object":
+                    ret_tuple = self.one_hot_encode_not_nan(i)
+                    for k in ret_tuple[0].T:
+                        self.arrs.append(k)
+                    for j in ret_tuple[1]:
+                        self.cols.append(i+'_'+j)
+                else:
+                    self.arrs.append(self.normalize_numerical(self.df[i]))
+                    self.cols.append(i)
+        self.prepared_df = pd.DataFrame(np.array(self.arrs).T, columns=self.cols)
+        return pd.DataFrame(np.array(self.arrs).T, columns=self.cols), self.y
+
+"""#EDA Analysis"""
+
+df = pd.read_csv('train.csv')
+df.head()
+
+#Data Description
+
+df.info()
+df.describe()
+
+#number of NaN values
+df.isnull().sum()
+
+#Correlation Heat Map
+
+sns.heatmap(new_df.corr())
+
+df = pd.read_csv('train.csv')
+y = df["Habitability_score"].values
+ids = df['Property_ID'].values  
+df.drop(['Habitability_score', 'Property_ID'], axis=1, inplace=True)
+preparator = DataPrep(df, y)
+PreparedData, labels = preparator.prepare()
+X_train, y_train, X_test, y_test = preparator.train_test_split(0.2)
+n_data, n_features = PreparedData.shape[0:2]
+X = X_train
+y = y_train
+"%d data available with %d features (some are one hot encoded)"%(n_data, n_features)
+
+"""# Linear Regression Model"""
+
+import numpy as np
+
+
+class Xavier(object):
+    def __init__(self):
+        pass
+    
+    def initialize(self, weights_shape, fan_in, fan_out):
+        sigma = np.sqrt(2./(fan_out+fan_in))
+        return np.random.randn(*weights_shape) * sigma
+
+import numpy as np
+
+class Linear_Regression_SGD():
+    
+    def __init__(self,features, ground_truth_y, learning_rate):                     #f-->nxm(n samples, m features)            
+        self.weights = np.random.randn(features.shape[1]+1,1)  #w-->(m+1)x1
+        #self.weights = Xavier().initialize([features.shape[1]+1,1], features.shape[0]*(features.shape[1]+1), features.shape[1]+1 )
+        bias = np.ones(features.shape[0], dtype=int)  #bias-->1xn
+        self.features = np.insert(features, 0, bias, axis=1)  #f-->nx(m+1)
+        self.ground_truth_y = ground_truth_y[:, np.newaxis]
+        self.learning_rate = learning_rate
+        self.loss_list = list()
+        self.n = ground_truth_y.shape[0]
+
+    def Fitting(self):
+        self.fitted_y = np.dot(self.features, self.weights)
+        
+    def Loss(self):
+        #self.loss = (1/(2*self.n))*(np.sum(np.square(self.fitted_y - self.ground_truth_y))) 
+        self.loss = (1/(2*self.n))*np.dot((self.fitted_y - self.ground_truth_y).T, self.fitted_y - self.ground_truth_y)
+        return self.loss  
+        
+    def Loss_Derivative(self):
+        self.dfitted_y = (1/self.n)*(self.fitted_y-self.ground_truth_y).T
+        self.dweights = np.dot(self.dfitted_y, self.features).T
+    
+    def Gradient_Descent(self):
+        self.weights = self.weights - self.learning_rate * self.dweights
+        
+    def Train(self, n_epochs, X_val = None, y_val = None):
+        if X_val is not None:
+            valloss_list = list()
+            bias = np.ones(X_val.shape[0], dtype=int)
+            X_val = np.insert(X_val, 0, bias, axis=1)
+            val = True
+        for epoch in range(n_epochs):
+            self.Fitting()
+            self.Loss_Derivative()
+            self.Gradient_Descent()
+            loss = self.Loss()
+            if val:
+                  valloss = self.Test(X_val, y_val)
+                  valloss_list.append(valloss)
+
+            self.loss_list.append(loss)
+            if epoch % 100 == 0:
+                print('Epoch: %d \tLoss: %.4f\tval_loss: %.4f'%(epoch, loss, valloss))
+                
+        if val:
+            return self.loss_list, valloss_list
+        return self.loss_list
+
+    def Test(self, X, y):
+        n = X.shape[0]
+        y_hat = np.dot(X, self.weights)[:,0]
+        loss = (1/(2*n))*np.dot((y_hat - y).T, (y_hat - y))
+        return loss
+
+class Linear_Regression_MSE(object):
+    def __init__(self,features, ground_truth_y):                     #f-->nxm(n samples, m features)            
+        bias = np.ones((len(features),), dtype=int)              #bias-->1xn
+        self.features = np.insert(features, 0, bias, axis=1)    #f-->nx(m+1)
+        self.ground_truth_y = ground_truth_y
+        
+    def Optimize_Weights(self):
+        self.a = np.linalg.inv(np.dot(self.features.T, self.features))
+        self.b = np.dot(self.a, self.features.T)
+        self.weights = np.dot(self.b, self.ground_truth_y)            #w-->(m+1)x1
+        
+
+    def Predict(self):
+        self.fitted_y = np.dot(self.features, self.weights)
+        return self.fitted_y
+        
+    def Calculate_Loss(self):
+        self.n = self.ground_truth_y.shape[0]
+        print(self.fitted_y.shape, self.ground_truth_y.shape)
+        self.loss = (1/(2*self.n))*(np.sum(np.square(self.fitted_y - self.ground_truth_y)))
+        return self.loss
+
+model = Linear_Regression_MSE(X, y)
+model.Optimize_Weights()
+model.Predict()
+print(model.Calculate_Loss())
+
+import matplotlib.pyplot as plt
+
+model2 = Linear_Regression_SGD(X,y,0.05)
+epoch = 1000
+losses, val_losses = model2.Train(epoch, X_test, y_test)
+plt.plot(np.arange(epoch), np.squeeze(losses) )
+plt.xlabel('number of epochs')
+plt.ylabel('loss')
+plt.title('Train ')
+plt.show()
+plt.plot(np.arange(epoch), np.squeeze(val_losses) )
+plt.xlabel('number of epochs')
+plt.ylabel('loss')
+plt.title('Test ')
+
+sk =np.dot(model.features.T, model.features)
+l = np.linalg.det(k)
+print(l)
+

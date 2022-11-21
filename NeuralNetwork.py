@@ -1,20 +1,19 @@
 from pyflow import *
-
+import pickle
 t = Tensor
 
 class NeuralNetwork(object):
-    def __init__(self, optimizer):
-        self.optimizer_str = optimizer
+    def __init__(self, loss_layer, dataset):
         self._testing_phase = False
         self.loss = list()
         self.layers = list()
-        self.data = None
-        self.loss_layer = None
+        self.dataset = dataset
+        self.loss_layer = loss_layer
     
     def append_layer(self, layer):
         self.layers.append(layer)
     
-    def forward(self):
+    def __forward(self):
         X, y = self.data.next_batch()
         y = y[:, None, None]
         X = X[:, :, None]
@@ -25,7 +24,7 @@ class NeuralNetwork(object):
         loss = self.loss_layer.forward(X, y)
         return loss
 
-    def backward(self):
+    def __backward(self):
         y = self.labels
         X = self.loss_layer.backward(y)
         for layer in reversed(self.layers):
@@ -39,9 +38,9 @@ class NeuralNetwork(object):
             inner_loss = 0
             iterations = 0
             while not self.data.finished:
-                loss = self.forward()
+                loss = self.__forward()
                 inner_loss += loss
-                self.backward()
+                self.__backward()
                 iterations += 1
             inner_loss /= iterations
             self.loss.append(inner_loss)
@@ -63,22 +62,32 @@ class NeuralNetwork(object):
         return X
 
     def save_model(self, path):
-        from os import system
-        system("mkdir " + path)
-        for layer in self.layers:
-            layer.save(path)
-        self.loss_layer.save(path)
+        import os
+        if os.path.exists(path):
+            print("Path already exists, specify a new path")
+            return
+        os.system("mkdir " + path)
+        for layer_num in range(len(self.layers)):
+            self.layers[layer_num].save(path, layer_num)
+        str_layers = [str(layer.__class__.__name__) for layer in self.layers]
+        with open(path + '/' + 'model.info', 'wb') as f:
+            pickle.dump(str_layers, f)
+            pickle.dump(self.loss_layer.__class__.__name__, f)
     
     def load_model(self, path):
-        from os import listdir
-        layer_list = listdir(path)
-        layer_list.sort()
-        for layer in layer_list:
-            if layer.startswith('loss'):
-                with open(path + layer, 'r') as f:
-                    layer_type = f.readline().strip()
-                    self.loss_layer = eval(layer_type + '()')
-            else:
-                layer_type = layer.split('_')[1]
-                layer = eval(layer_type(path+layer))
-                self.layers.append(layer)
+        with open(path + '/' + 'model.info', 'rb') as f:
+            str_layers = pickle.load(f)
+            self.loss_layer = pickle.load(f)
+        self.layers = list()
+        for str_layer in str_layers:
+            layer = eval(str_layer)()
+            layer.load(path, len(self.layers))
+            self.layers.append(layer)
+        self.loss_layer = eval(self.loss_layer)()
+
+    def predict(self, X):
+        return self.test(X)
+
+    def __call__(self, X):
+        return self.test(X)
+        

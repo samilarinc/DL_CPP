@@ -28,3 +28,7 @@ void SGD::calculate_update(Tensor& weights, Tensor gradient_weights) {
 double SGD::getLearningRate() const {
     return this->learning_rate;
 }
+
+double SGD::getMomentum() const {
+    return this->momentum;
+}

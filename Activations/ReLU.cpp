@@ -1,15 +1,5 @@
 #include "ReLU.hpp"
 
-ReLU::ReLU() {
-    trainable = false;
-}
-
-ReLU::~ReLU() {
-    // if(last_input.data != nullptr) {
-    //     free(last_input.data);
-    // }
-}
-
 Tensor ReLU::forward(const Tensor& input) {
     Tensor output = Tensor(input.getBatchsize(), input.getRows(), input.getCols());
     last_input = Tensor(input);
@@ -33,4 +23,14 @@ Tensor ReLU::backward(const Tensor& error) {
         }
     }
     return output;
+}
+
+void ReLU::save(string path, int num) {
+    ofstream file(path + "/" + to_string(num) + ".ReLU");
+    file.close();
+}
+
+void ReLU::load(string path, int num) {
+    ifstream file(path + "/" + to_string(num) + ".ReLU");
+    file.close();
 }

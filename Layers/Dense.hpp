@@ -21,6 +21,8 @@ public:
     Tensor getBias() const;
     Tensor forward(const Tensor&) override;
     Tensor backward(const Tensor&) override;
+    void save(string, int) override;
+    void load(string, int) override;
     bool trainable = true;
     // void setOptimizer(BaseOptimizer*);
     // BaseOptimizer* getOptimizer() const;
@@ -32,6 +34,7 @@ public:
     Tensor weights;
     Tensor bias;
     Tensor last_input;
+    string optimizer_type;
     BaseOptimizer* optimizer = nullptr;
     BaseOptimizer* bias_optimizer = nullptr;
 };
