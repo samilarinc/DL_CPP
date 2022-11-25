@@ -13,6 +13,10 @@ SGD::SGD(double learning_rate, double momentum) {
 }
 
 void SGD::calculate_update(Tensor& weights, Tensor gradient_weights) {
+    if(this->scheduler.getType() != SchedulerType::NOT_SET) {
+        this->scheduler.step(this->current_epoch, this->learning_rate);
+    }
+    this->current_epoch += 1;
     if(this->momentum != 0.0) {
         if(this->velocity.getRows() == 0) { // Initialize velocity first time
             this->velocity = Tensor(gradient_weights); 
@@ -31,4 +35,8 @@ double SGD::getLearningRate() const {
 
 double SGD::getMomentum() const {
     return this->momentum;
+}
+
+void SGD::addScheduler(Scheduler scheduler) {
+    this->scheduler = scheduler;
 }

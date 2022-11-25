@@ -3,6 +3,7 @@
 
 #include "Tensor.hpp"
 #include "BaseOptimizer.hpp"
+#include "Scheduler.hpp"
 
 class Adam : public BaseOptimizer
 {
@@ -12,6 +13,7 @@ public:
     double getLearningRate() const;
     double getMu() const;
     double getRho() const;
+    void addScheduler(Scheduler) override;
 
     double lr;
     double mu;
@@ -19,6 +21,7 @@ public:
     int k;
     Tensor v;
     Tensor r;
+    Scheduler scheduler;
 };
 
 #endif

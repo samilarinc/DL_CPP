@@ -76,6 +76,7 @@ Tensor Dense::backward(const Tensor& error) {
 
     gradient_bias = db;
     gradient_weights = dw;
+    this->current_epoch += 1;
     return dx;
 }
 
@@ -155,4 +156,16 @@ void Dense::load(string path, int num) {
         }
     }
     file.close();
+}
+
+void Dense::setScheduler(Scheduler scheduler) {
+    if(optimizer != nullptr) {
+        optimizer->addScheduler(scheduler);
+    }
+    if(bias_optimizer != nullptr) {
+        bias_optimizer->addScheduler(scheduler);
+    }
+    else{
+        printf("No optimizer set!");
+    }
 }

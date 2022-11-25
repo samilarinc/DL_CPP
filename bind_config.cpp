@@ -1,6 +1,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <string>
+#include <vector>
 #include "Dense.hpp"
 #include "Tensor.hpp"
 #include "SGD.hpp"
@@ -10,6 +11,7 @@
 #include "CrossEntropyLoss.hpp"
 #include "ReLU.hpp"
 #include "Sigmoid.hpp"
+#include "Scheduler.hpp"
 
 namespace py = pybind11;
 using namespace std;
@@ -95,8 +97,17 @@ PYBIND11_MODULE(pyflow, m){
         .def(py::init<double>())
         .def("calculate_update", &SGD::calculate_update)
         .def("learning_rate", &SGD::getLearningRate)
+        .def("momentum", &SGD::getMomentum)
+        .def("addScheduler", &SGD::addScheduler)
         ;
-
+    py::class_<Adam>(m, "Adam")
+        .def(py::init<double, double, double>())
+        .def("calculate_update", &Adam::calculate_update)
+        .def("learning_rate", &Adam::getLearningRate)
+        .def("beta1", &Adam::getMu)
+        .def("beta2", &Adam::getRho)
+        .def("addScheduler", &Adam::addScheduler)
+        ;
     py::class_<L1Loss>(m, "L1Loss")
         .def(py::init<>())
         .def("forward", &L1Loss::forward)
@@ -125,5 +136,21 @@ PYBIND11_MODULE(pyflow, m){
         .def("backward", &Sigmoid::backward)
         .def("save", &Sigmoid::save)
         .def("load", &Sigmoid::load)
+        ;
+    py::class_<Scheduler>(m, "Scheduler")
+        .def(py::init<int, double>())
+        .def(py::init<vector<int>, double>())
+        .def(py::init<double>())
+        .def(py::init<double, int>())
+        .def(py::init<double, double, int>())
+        .def("step", &Scheduler::step)
+        ;
+    py::enum_<SchedulerType>(m, "SchedulerType")
+        .value("STEP_LR", SchedulerType::STEP_LR)
+        .value("MULTI_STEP_LR", SchedulerType::MULTI_STEP_LR)
+        .value("EXPONENTIAL_LR", SchedulerType::EXPONENTIAL_LR)
+        .value("POLYNOMIAL_LR", SchedulerType::POLYNOMIAL_LR)
+        .value("LINEAR_LR", SchedulerType::LINEAR_LR)
+        .export_values()
         ;
 }

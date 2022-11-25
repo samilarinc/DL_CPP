@@ -30,3 +30,7 @@ double Adam::getMu() const {
 double Adam::getRho() const {
     return rho;
 }
+
+void Adam::addScheduler(Scheduler scheduler) {
+    this->scheduler = scheduler;
+}

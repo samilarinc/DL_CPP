@@ -11,4 +11,5 @@
 - [x] predict
 - [x] call model directly with input instead of test
 - [ ] evaluate
-- [ ] scheduler for optimizer
+- [x] scheduler for optimizer
+- [ ] test scheduler
