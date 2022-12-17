@@ -1,12 +1,11 @@
 #include "Tensor.hpp"
-#include <exception>
 
 Tensor::Tensor() {
     batch_size = 0;
     rows = 0;
     cols = 0;
     data = nullptr;
-    tuple<int, int, int> shape = make_tuple(0, 0, 0);
+    shape = make_tuple(0, 0, 0);
 }
 
 Tensor::Tensor(int batch_size, int rows, int cols) {
@@ -28,17 +27,36 @@ Tensor::Tensor(int batch_size, int rows, int cols, double constant){
     }
 }
 
-Tensor::Tensor(int batch_size, int rows, int cols, double min, double max){ 
+Tensor::Tensor(int batch_size, int rows, int cols, double min, double max, string initializer) { 
     this->batch_size = batch_size;
     this->rows = rows;
     this->cols = cols;
     this->shape = make_tuple(batch_size, rows, cols);
     data = new double[batch_size * rows * cols]();
-    random_device rd;
-    mt19937 gen(rd());
-    uniform_real_distribution<> dis(min, max);
-    for(int i = 0; i < batch_size * rows * cols; i++){
-        data[i] = dis(gen);
+    
+    mt19937 rng(0);
+    uniform_real_distribution<double> dist(min, max);
+
+    if (strcmp(initializer.c_str(), "uniform") == 0){
+        for (int i = 0; i < batch_size * rows * cols; i++)
+            data[i] = dist(rng);
+    }
+    else if (strcmp(initializer.c_str(), "xavier") == 0) {
+        double scale = sqrt(6.0 / (rows + cols));
+        for (int i = 0; i < batch_size * rows * cols; i++)
+            data[i] = dist(rng) * scale;
+    }
+    else if (strcmp(initializer.c_str(), "he") == 0) {
+        double scale = sqrt(2.0 / (rows));
+        for (int i = 0; i < batch_size * rows * cols; i++)
+            data[i] = dist(rng) * scale;
+    }
+    else if (strcmp(initializer.c_str(), "constant") == 0) {
+        for (int i = 0; i < batch_size * rows * cols; i++)
+            data[i] = min;
+    }
+    else {
+        printf("Invalid initializer\n");
     }
 }
 

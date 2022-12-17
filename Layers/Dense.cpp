@@ -1,13 +1,16 @@
 #include "Dense.hpp"
-#include <fstream>
-#include <sstream>
 
-Dense::Dense(int input_size, int output_size, double lr, string opt, double momentum, double mu, double rho) {
+Dense::Dense(int input_size, int output_size, double lr, string opt, double momentum, double mu, double rho, string initializer) {
     this->input_size = input_size;
     this->output_size = output_size;
     this->optimizer_type = opt;
-    weights = Tensor(1, output_size, input_size, 0.0, 1.0);
-    bias = Tensor(1, output_size, 1, 0.0, 1.0);
+    if (strcmp(initializer.c_str(), "constant") == 0) {
+        weights = Tensor(1, output_size, input_size, 0.1, 1.0, initializer);
+        bias = Tensor(1, output_size, 1, 0.0, 1.0, initializer);
+    } else {
+        weights = Tensor(1, output_size, input_size, 0.0, 1.0, initializer);
+        bias = Tensor(1, output_size, 1, 0.0, 1.0, initializer);
+    }
     if(opt == "SGD") {
         // printf("SGD Optimizer with learning rate %f and momentum %f\n\n", lr, momentum);
         this->optimizer = new SGD(lr, momentum);

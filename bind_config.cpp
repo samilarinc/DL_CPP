@@ -10,6 +10,7 @@
 #include "CrossEntropyLoss.hpp"
 #include "ReLU.hpp"
 #include "Sigmoid.hpp"
+#include "Dropout.hpp"
 
 namespace py = pybind11;
 using namespace std;
@@ -19,7 +20,7 @@ PYBIND11_MODULE(pyflow, m){
         .def(py::init<>())
         .def(py::init<int, int, int>())
         .def(py::init<int, int, int, double>())
-        .def(py::init<int, int, int, double, double>())
+        .def(py::init<int, int, int, double, double, string>())
         .def(py::init<const Tensor&>())
         .def(py::init<vector<vector<vector<double>>>>())
         .def(py::init<vector<vector<double>>>())
@@ -75,11 +76,13 @@ PYBIND11_MODULE(pyflow, m){
     
     py::class_<Dense>(m, "FullyConnected")
         .def(py::init<>())
+        .def(py::init<int, int, double, string, double, double, double, string>())
         .def(py::init<int, int>())
         .def(py::init<int, int, double, string>())
         .def(py::init<int, int, double, string, double>())
+        .def(py::init<int, int, double, string, double, string>())
         .def(py::init<int, int, double, string, double, double>())
-        .def(py::init<int, int, double, string, double, double, double>())
+        .def(py::init<int, int, double, string, double, double, string>())
         .def("forward", &Dense::forward)
         .def("backward", &Dense::backward)
         .def("save", &Dense::save)
@@ -125,5 +128,14 @@ PYBIND11_MODULE(pyflow, m){
         .def("backward", &Sigmoid::backward)
         .def("save", &Sigmoid::save)
         .def("load", &Sigmoid::load)
+        ;
+
+    py::class_<Dropout>(m, "Dropout")
+        .def(py::init<double>())
+        .def("forward", &Dropout::forward)
+        .def("backward", &Dropout::backward)
+        .def("save", &Dropout::save)
+        .def("load", &Dropout::load)
+        .def("set_training", &Dropout::set_training)
         ;
 }

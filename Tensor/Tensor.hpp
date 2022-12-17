@@ -1,11 +1,15 @@
 #ifndef TENSOR_HPP
 #define TENSOR_HPP
 
+#include <math.h>
+#include <string.h>
+
 #include <tuple>
 #include <vector>
 #include <string>
-#include <math.h>
+#include <exception>
 #include <random>
+#include <cmath>
 
 using namespace std;
 
@@ -14,7 +18,7 @@ public:
     Tensor();
     Tensor(int, int, int);
     Tensor(int, int, int, double);
-    Tensor(int, int, int, double, double); 
+    Tensor(int, int, int, double, double, string); 
     Tensor(const Tensor&);
     Tensor(vector<vector<vector<double>>>);
     Tensor(vector<vector<double>>);
