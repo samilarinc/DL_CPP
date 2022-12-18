@@ -43,3 +43,7 @@ void Dropout::load(string path, int num) {
     file >> p;
     file.close();
 }
+
+void Dropout::set_training(bool is_training) {
+    this->is_training = is_training;
+}

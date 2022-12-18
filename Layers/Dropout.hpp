@@ -19,7 +19,7 @@ public:
     Tensor backward(const Tensor&) override;
     void save(string, int) override;
     void load(string, int) override;
-    double set_training(bool);
+    void set_training(bool);
 
 private:
     double p;

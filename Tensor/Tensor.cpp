@@ -317,9 +317,7 @@ Tensor Tensor::abs() const{
 
 Tensor Tensor::copy() const{
     Tensor output(batch_size, rows, cols);
-    for(int i = 0; i < batch_size * rows * cols; i++){
-        output.data[i] = data[i];
-    }
+    std::copy(data, data + batch_size * rows * cols, output.data);
     return output;
 }
 

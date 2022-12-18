@@ -1,13 +1,14 @@
-from pyflow import *
 import pickle
+from pyflow import Tensor, FullyConnected, SGD, L1Loss, L2Loss, CrossEntropyLoss, ReLU, Sigmoid, Dropout, L1Regularizer, L2Regularizer
 t = Tensor
 
 class NeuralNetwork(object):
-    def __init__(self, dataset, loss_layer=None, path=None):
+    def __init__(self, dataset, loss_layer=None, path=None, regularizer=None):
         self._testing_phase = False
         self.loss = list()
         self.layers = list()
         self.dataset = dataset
+        self.regularizer = regularizer
         if loss_layer is not None:
             self.loss_layer = loss_layer
         elif path is not None:
@@ -17,29 +18,33 @@ class NeuralNetwork(object):
 
     def append_layer(self, layer):
         self.layers.append(layer)
-    
+
     def __forward(self):
         X, y = self.dataset.next_batch()
+        reg_loss = 0
         y = y[:, None, None]
         X = X[:, :, None]
         X, y = t(X.tolist()), t(y.tolist())
         self.labels = y
         for layer in self.layers:
             X = layer.forward(X)
+            if self.regularizer is not None:
+                reg_loss += self.regularizer.forward(layer.weights)
         loss = self.loss_layer.forward(X, y)
-        return loss
+        return loss + reg_loss
 
     def __backward(self):
         y = self.labels
         X = self.loss_layer.backward(y)
         for layer in reversed(self.layers):
             X = layer.backward(X)
-    
-    def train(self, epochs, cross_val = False, valset = None, verbose = True):
+
+    def train(self, epochs, cross_val=False, valset=None, verbose=True):
         self.vallosses = list()
         if cross_val and not verbose:
             raise ValueError("Cross validation must be verbose")
         for epoch in range(epochs):
+            reg_loss = 0
             inner_loss = 0
             iterations = 0
             while not self.dataset.finished:
@@ -54,15 +59,18 @@ class NeuralNetwork(object):
                 if cross_val:
                     loss_type = self.loss_layer.__class__.__name__
                     if loss_type == 'L1Loss':
-                        valloss = (self.test(valset[0]) - valset[1]).abs().sum() / valset[1].shape[0]
+                        valloss = (
+                            self.test(valset[0]) - valset[1]).abs().sum() / valset[1].shape[0]
                     elif loss_type == 'L2Loss':
-                        valloss = (self.test(valset[0]) - valset[1]).power(2).sum() / valset[1].shape[0]
-                print("Epoch: %4d\n\tTrain Loss: %6.2f"%(epoch+1, inner_loss) + (("\tVal Loss: %6.2f"%valloss) if cross_val else ""))
+                        valloss = (
+                            self.test(valset[0]) - valset[1]).power(2).sum() / valset[1].shape[0]
+                print("Epoch: %4d\n\tTrain Loss: %6.2f" % (
+                    epoch+1, inner_loss) + (("\tVal Loss: %6.2f" % valloss) if cross_val else ""))
             self.vallosses.append(valloss)
         if cross_val:
             return self.loss, self.vallosses
         return self.loss
-            
+
     def test(self, data):
         self.testing_phase = True
         X = t(data[:, :, None].tolist())
@@ -82,7 +90,7 @@ class NeuralNetwork(object):
         with open(path + '/' + 'model.info', 'wb') as f:
             pickle.dump(str_layers, f)
             pickle.dump(self.loss_layer.__class__.__name__, f)
-    
+
     def load_model(self, path):
         with open(path + '/' + 'model.info', 'rb') as f:
             str_layers = pickle.load(f)
@@ -99,4 +107,3 @@ class NeuralNetwork(object):
 
     def __call__(self, X):
         return self.test(X)
-        

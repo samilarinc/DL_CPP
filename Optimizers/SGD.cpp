@@ -1,15 +1,17 @@
 #include "SGD.hpp"
 
-SGD::SGD(double learning_rate) {
-    this->learning_rate = learning_rate;
-    this->momentum = 0.0;
-    this->velocity = Tensor();
-}
-
-SGD::SGD(double learning_rate, double momentum) {
+SGD::SGD(double learning_rate, double momentum, string RegularizerType, double lambda) {
     this->learning_rate = learning_rate;
     this->momentum = momentum;
-    this->velocity = Tensor(0, 0, 0);
+    if(RegularizerType == "L1") {
+        this->regularizer = new L1Regularizer(lambda);
+    }
+    else if(RegularizerType == "L2") {
+        this->regularizer = new L2Regularizer(lambda);
+    }
+    else {
+        this->regularizer = nullptr;
+    }
 }
 
 void SGD::calculate_update(Tensor& weights, Tensor gradient_weights) {
@@ -22,6 +24,9 @@ void SGD::calculate_update(Tensor& weights, Tensor gradient_weights) {
     }
     else {
         weights = weights - gradient_weights * this->learning_rate;
+    }
+    if (this->regularizer != nullptr) {
+        this->regularizer->calculate_gradient(weights);
     }
 }
 

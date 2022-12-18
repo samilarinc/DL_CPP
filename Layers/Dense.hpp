@@ -14,7 +14,8 @@
 class Dense : public BaseLayer {
 public:
     Dense() = default;
-    Dense(int input_size, int output_size, double lr, string opt, double momentum, double mu, double rho, string initializer);
+    Dense(int input_size, int output_size, double lr, string opt, double momentum, double mu, double rho, string initializer, string regularizer, double lambda);
+    Dense(int input_size, int output_size, double lr, string opt, double momentum, double mu, double rho, string initializer) : Dense(input_size, output_size, lr, opt, momentum, mu, rho, initializer, "NULL", 0) {};
     Dense(int input_size, int output_size) : Dense(input_size, output_size, 0, "NULL", 0, 0, 0, "uniform") {};
     Dense(int input_size, int output_size, double lr, string opt) : Dense(input_size, output_size, lr, opt, 0, 0, 0, "uniform") {};
     Dense(int input_size, int output_size, double lr, string opt, double momentum) : Dense(input_size, output_size, lr, opt, momentum, 0, 0, "uniform") {};

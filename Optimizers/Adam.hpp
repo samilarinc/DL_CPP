@@ -3,11 +3,15 @@
 
 #include "Tensor.hpp"
 #include "BaseOptimizer.hpp"
+#include "Regularizer.hpp"
+#include "L1_Regularizer.hpp"
+#include "L2_Regularizer.hpp"
 
 class Adam : public BaseOptimizer
 {
 public:
-    Adam(double, double, double);
+    Adam(double lr, double mu, double rho, string RegularizerType, double lambda);
+    Adam(double lr, double mu, double rho) : Adam(lr, mu, rho, "NULL", 0) {};
     void calculate_update(Tensor&, Tensor) override;
     double getLearningRate() const;
     double getMu() const;
@@ -19,6 +23,7 @@ public:
     int k;
     Tensor v;
     Tensor r;
+    Regularizer* regularizer = nullptr;
 };
 
 #endif

@@ -11,6 +11,8 @@
 #include "ReLU.hpp"
 #include "Sigmoid.hpp"
 #include "Dropout.hpp"
+#include "L1_Regularizer.hpp"
+#include "L2_Regularizer.hpp"
 
 namespace py = pybind11;
 using namespace std;
@@ -76,6 +78,7 @@ PYBIND11_MODULE(pyflow, m){
     
     py::class_<Dense>(m, "FullyConnected")
         .def(py::init<>())
+        .def(py::init<int, int, double, string, double, double, double, string, string, double>())
         .def(py::init<int, int, double, string, double, double, double, string>())
         .def(py::init<int, int>())
         .def(py::init<int, int, double, string>())
@@ -137,5 +140,15 @@ PYBIND11_MODULE(pyflow, m){
         .def("save", &Dropout::save)
         .def("load", &Dropout::load)
         .def("set_training", &Dropout::set_training)
+        ;
+    py::class_<L1Regularizer>(m, "L1Regularizer")
+        .def(py::init<double>())
+        .def("norm", &L1Regularizer::norm)
+        .def("calculate_gradient", &L1Regularizer::calculate_gradient)
+        ;
+    py::class_<L2Regularizer>(m, "L2Regularizer")
+        .def(py::init<double>())
+        .def("norm", &L2Regularizer::norm)
+        .def("calculate_gradient", &L2Regularizer::calculate_gradient)
         ;
 }

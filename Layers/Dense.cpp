@@ -1,6 +1,6 @@
 #include "Dense.hpp"
 
-Dense::Dense(int input_size, int output_size, double lr, string opt, double momentum, double mu, double rho, string initializer) {
+Dense::Dense(int input_size, int output_size, double lr, string opt, double momentum, double mu, double rho, string initializer, string regularizer, double lambda) {
     this->input_size = input_size;
     this->output_size = output_size;
     this->optimizer_type = opt;
@@ -12,17 +12,14 @@ Dense::Dense(int input_size, int output_size, double lr, string opt, double mome
         bias = Tensor(1, output_size, 1, 0.0, 1.0, initializer);
     }
     if(opt == "SGD") {
-        // printf("SGD Optimizer with learning rate %f and momentum %f\n\n", lr, momentum);
-        this->optimizer = new SGD(lr, momentum);
-        this->bias_optimizer = new SGD(lr, momentum);
+        this->optimizer = new SGD(lr, momentum, regularizer, lambda);
+        this->bias_optimizer = new SGD(lr, momentum, regularizer, lambda);
     }
     else if(opt == "Adam") {
-        // printf("Adam Optimizer with learning rate %f, mu %f and rho %f\n\n", lr, mu, rho);
-        this->optimizer = new Adam(lr, mu, rho);
-        this->bias_optimizer = new Adam(lr, mu, rho);
+        this->optimizer = new Adam(lr, mu, rho, regularizer, lambda);
+        this->bias_optimizer = new Adam(lr, mu, rho, regularizer, lambda);
     }
     else {
-        // printf("No optimizer specified, using SGD with learning rate %f and momentum %f\n\n", lr, momentum);
         this->optimizer = nullptr;
         this->bias_optimizer = nullptr;
     }
