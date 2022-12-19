@@ -90,6 +90,7 @@ class NeuralNetwork(object):
         with open(path + '/' + 'model.info', 'wb') as f:
             pickle.dump(str_layers, f)
             pickle.dump(self.loss_layer.__class__.__name__, f)
+            pickle.dump(self.regularizer.__class__.__name__, f)
 
     def load_model(self, path):
         with open(path + '/' + 'model.info', 'rb') as f:

@@ -8,7 +8,7 @@ Tensor Dropout::forward(const Tensor& input) {
     }
     if (is_training){
         srand(time(0));
-        mask = Tensor(input.getRows(), input.getCols(), input.getBatchsize(), 1.0);
+        mask = Tensor(input.getBatchsize(), input.getRows(), input.getCols(), 1.0);
         for (int i = 0; i < input.getRows(); i++) {
             for (int j = 0; j < input.getCols(); j++) {
                 for (int k = 0; k < input.getBatchsize(); k++) {
