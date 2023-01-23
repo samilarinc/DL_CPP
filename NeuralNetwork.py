@@ -29,7 +29,8 @@ class NeuralNetwork(object):
         for layer in self.layers:
             X = layer.forward(X)
             if self.regularizer is not None:
-                reg_loss += self.regularizer.forward(layer.weights)
+                if layer.__class__.__name__ == 'FullyConnected':
+                    reg_loss += self.regularizer.norm(layer.weights)
         loss = self.loss_layer.forward(X, y)
         return loss + reg_loss
 
@@ -39,12 +40,11 @@ class NeuralNetwork(object):
         for layer in reversed(self.layers):
             X = layer.backward(X)
 
-    def train(self, epochs, cross_val=False, valset=None, verbose=True):
+    def train(self, epochs, validate=False, valset=None, verbose=True):
         self.vallosses = list()
-        if cross_val and not verbose:
+        if validate and not verbose:
             raise ValueError("Cross validation must be verbose")
         for epoch in range(epochs):
-            reg_loss = 0
             inner_loss = 0
             iterations = 0
             while not self.dataset.finished:
@@ -56,7 +56,7 @@ class NeuralNetwork(object):
             self.loss.append(inner_loss)
             self.dataset.finished = False
             if verbose:
-                if cross_val:
+                if validate:
                     loss_type = self.loss_layer.__class__.__name__
                     if loss_type == 'L1Loss':
                         valloss = (
@@ -64,10 +64,10 @@ class NeuralNetwork(object):
                     elif loss_type == 'L2Loss':
                         valloss = (
                             self.test(valset[0]) - valset[1]).power(2).sum() / valset[1].shape[0]
+                    self.vallosses.append(valloss)
                 print("Epoch: %4d\n\tTrain Loss: %6.2f" % (
-                    epoch+1, inner_loss) + (("\tVal Loss: %6.2f" % valloss) if cross_val else ""))
-            self.vallosses.append(valloss)
-        if cross_val:
+                    epoch+1, inner_loss) + (("\tVal Loss: %6.2f" % valloss) if validate else ""))
+        if validate:
             return self.loss, self.vallosses
         return self.loss
 
@@ -75,6 +75,8 @@ class NeuralNetwork(object):
         self.testing_phase = True
         X = t(data[:, :, None].tolist())
         for layer in self.layers:
+            if layer.__class__.__name__ == 'Dropout':
+                continue
             X = layer.forward(X)
         return X
 
